@@ -13,3 +13,8 @@ deployment_target: environment
 
 # The speech API has no browser surface of its own, so it deliberately has no navigation entry.
 routes: /stt
+
+# Where the browsable API document lives: swagger-ui under this service's non-application
+# root, which sits under the primary route above. The shell's Api Docs viewer reads it off
+# /main-navigation and frames it for this repository.
+api-docs: /stt/q/swagger-ui
