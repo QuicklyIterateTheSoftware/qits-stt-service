@@ -10,8 +10,9 @@ file is the working conventions on top of it.
 would break that is not a tradeoff to weigh, it is the thing this repo exists to avoid.
 
 That is why the poms duplicate versions instead of inheriting them, why the error types are copied
-rather than imported, and — above all — why **no test may ever create a venv, run pip, or spawn the
-worker**. See "Tests" below.
+rather than imported, and — above all — why **no test may ever create a venv, run pip, or download
+the model**. See "Tests" below, including the one test that does spawn a worker process and why
+that does not break this rule.
 
 **`service/` compiles to a GraalVM native image**, the same rule qits-workspace-daemon and
 qits-gateway carry, and it extends the clone-alone rule rather than qualifying it: `.sdkmanrc` names
@@ -97,7 +98,7 @@ would pass just as happily against a mechanism that never reads it.
 
 ## Tests
 
-Both suites are `@QuarkusTest` and **neither touches python**:
+The two `@QuarkusTest` suites **touch no python at all**:
 
 - `TranscriptionServiceTest` installs a `FakeProcessExecutor` (records the bootstrap commands,
   returns canned results) and a `FakeSpeechWorker` (records the staged WAV, returns a canned
@@ -106,20 +107,47 @@ Both suites are `@QuarkusTest` and **neither touches python**:
 - `SpeechControllerTest` is validation-level only: every request it sends fails before the
   transcription runner could spawn.
 
-A test that actually ran the worker would need a venv, a pip install and a 700 MB model download.
-Keep the fakes.
+A test that actually ran the real worker would need a venv, a pip install and a 700 MB model
+download. Keep the fakes.
+
+### The userflow, and the one worker process a test may spawn
+
+`TranscriptionBootstrapIT` is a `@QuarkusIntegrationTest`: it launches the **packaged** artifact and
+tells two `@UserStory` stories against it — a clip transcribed end to end, and the three refusals
+that never reach the engine. `mvn verify` emits them under `service/target/userstories/`, and
+`.config/qits/ci-event-userflows.yml` publishes that directory per commit as the docs bundle
+`@userflows/qits-stt`. `skipITs` is `false` in `service/pom.xml` so a plain `mvn verify` runs it;
+`docker/Dockerfile` stops at `package`, so the image build is untouched.
+
+**It is the only test that spawns a worker, and it still creates no venv, runs no pip and downloads
+no model.** It pre-seeds `qits.speech.home` with a dozen-line `/bin/sh` script at
+`venv/bin/python` — the exact path `SpeechWorker` runs — which speaks the worker protocol (one
+greeting line, then one WAV path in and one JSON line out) and records what it was asked. That is a
+posture `docker/Dockerfile` already describes: a deployment that cannot reach PyPI or the Hugging
+Face hub pre-seeds the volume. `qits.speech.python` is pointed at a path that cannot exist, so a
+broken fixture fails in milliseconds instead of reaching for PyPI.
+
+Why it earns its place, given the fakes above: **the packaged posture is the only one where the door
+and the process plumbing are real.** `@RolesAllowed("qits:admin")` is invisible to every
+`@QuarkusTest` here, because qits-auth-core's `%test` dev-user hands each one a `qits:admin`
+identity and `ForwardAuthMechanism` only ignores that fallback under `LaunchMode.NORMAL`; and
+`TranscriptionServiceTest` replaces `ProcessExecutor`/`SpeechWorker` with CDI fakes, so the real
+`ProcessBuilder`, the greeting handshake and the staged WAV's deletion never execute. Do not "fix"
+the IT by mocking either half — that is what the surefire suite is already for.
 
 App-level config lives in `service/src/main/resources/application.properties` and **the tests
 inherit it** — Quarkus merges main's copy into the test run, it is not shadowed. That is why
-`SpeechControllerTest` can assert `/stt/api/transcriptions` with no test-side `quarkus.rest.path`,
-and why `service/src/test/resources/application.properties` no longer exists.
+`SpeechControllerTest` can assert `/stt/api/transcriptions` with no test-side `quarkus.rest.path`.
+`service/src/test/resources/application.properties` exists again and holds exactly one line — the
+userflows class orderer, which configures the JUnit run rather than the application and has nowhere
+else to live. Nothing else may join it.
 
 Never re-declare an app-level setting in test resources. A second copy does not make the suite
 safer, it makes it lie: the run goes green because the *test* copy is right, so a wrong or missing
 value in the shipped copy — the one that actually reaches a deployment — passes unnoticed. Test
 resources are for genuine test-only overrides, and a real override belongs in a `@TestProfile`
-next to the test that needs it (see `NoDevUserProfile`, `TranscriptionServiceTest.SpeechTestProfile`)
-so its scope is visible.
+next to the test that needs it (see `NoDevUserProfile`, `TranscriptionServiceTest.SpeechTestProfile`,
+`TranscriptionBootstrapIT.PackagedWithAPreSeededEngine`) so its scope is visible.
 
 `OpenApiSchemaExportTest` writes `docs/openapi.yml` as a side effect. Regenerate and commit it
 whenever the route surface changes:
