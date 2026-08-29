@@ -1,14 +1,16 @@
-# The pipeline qits-ci runs on every push to a tracked branch of this repository.
-#
-# One step: build this repo's docker/Dockerfile and publish it under the tag that is the whole
-# contract with qits-deployments — <registry>/<repository>/<this repo's name>:<sha>. The step's own
-# container only drives the docker CLI; the build and the push happen in the host's daemon
-# through the socket this step declares (docker: true), which is also why the native build's
-# memory is the daemon's and not this container's. A failed push is a failed step is a FAILED
-# run, so the CD announcement (SUCCESS only) keeps implying "the image exists".
-#
-# A verify step belongs ahead of this one once a JDK build image exists; today the Dockerfile's
-# own native stage is the gate.
+# The image build, per push — moved from ci-post-receive.yml when this repo went domain-event-only,
+# the switch qits-githost and qits-artifacts already made. `checkout:` makes it a move rather than a
+# rewrite: the run builds the pushed branch at the pushed sha, but the pipeline is DISCOVERED at main,
+# so a pushed branch can no longer alter the CI that gates it. suppressCi restates what the
+# post-receive convention did with `-o qits.no-ci`. Separate from ci-event-userflows.yml on purpose:
+# that run is non-gating, a red verify must not cost the image.
+event: SCMPublishCommit
+when:
+  - repoId: { exact: qits-stt }
+    suppressCi: { exact: "false" }
+checkout:
+  branch: branch
+  sha: sha
 steps:
   - image: qits/build-images/ci-base:latest
     docker: true
