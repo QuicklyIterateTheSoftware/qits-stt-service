@@ -7,7 +7,7 @@
     <parent>
         <groupId>eu.wohlben.qits</groupId>
         <artifactId>qits-stt</artifactId>
-        <version>2026.824.212013</version>
+        <version>2026.829.114449</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -25,6 +25,20 @@
     <artifactId>qits-stt-service</artifactId>
     <name>qits-stt :: service</name>
     <packaging>quarkus</packaging>
+
+    <properties>
+        <!-- THIS MODULE OPTS BACK INTO ITS INTEGRATION TESTS (the root pom's default is true).
+             TranscriptionBootstrapIT is the only IT in the repository and it is cheap: it launches
+             the fast-jar failsafe just packaged, beside a dozen-line /bin/sh stand-in for the
+             resident speech engine that the test writes into target/. No docker, no database, no
+             python, no model download and no network — so it does not compromise the clone-alone
+             rule in AGENTS.md, and there is no heavyweight sibling IT for this flip to drag in.
+
+             It also has to be on for the userflows pipeline to have anything to publish: that IT is
+             what emits target/userstories/, and .config/qits/ci-event-userflows.yml runs a plain
+             `mvn verify` rather than naming a class. -->
+        <skipITs>false</skipITs>
+    </properties>
 
     <dependencies>
         <dependency>
@@ -83,6 +97,16 @@
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <!-- The user-story framework: TranscriptionBootstrapIT is written as @UserStory methods,
+                 so the packaged-boot proof doubles as documentation — steps, interactions and a
+                 sequence diagram emitted under target/userstories/. The stories are browserless (an
+                 Interactions parameter and no Flow), so the transitive Playwright never launches
+                 anything and no browser is needed to run them. Version from the root pom. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-userflows</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -123,6 +147,13 @@
                                      application.properties, not the maven finalName; the two have
                                      to be spelled the same or a native IT launches nothing. -->
                                 <native.image.path>${project.build.directory}/qits-stt</native.image.path>
+                                <!-- Launch the packaged app on a free port instead of the default
+                                     8081, which qits-docs found occupied on the deployment host and
+                                     which this repo's own AGENTS.md already records as the source of
+                                     a @QuarkusTest port flake. The launcher reads the real port back
+                                     out of the process's listening line, so nothing has to spell it
+                                     twice. -->
+                                <quarkus.http.test-port>0</quarkus.http.test-port>
                                 <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                             </systemPropertyVariables>
                         </configuration>
@@ -141,7 +172,9 @@
              `-Dnative` disables the fast-jar and enables the native image. It lives in THIS module,
              not the root pom, because only this module is an application — `domain` is a library jar
              and has nothing to native-compile. skipITs flips with it so a native build runs the
-             @QuarkusIntegrationTest suite against the binary rather than skipping it silently. -->
+             @QuarkusIntegrationTest suite against the binary rather than skipping it silently; it is
+             redundant since this module's own properties opt in above, and is kept so the profile
+             stays complete if that module default ever goes back to the root pom's `true`. -->
         <profile>
             <id>native</id>
             <activation>

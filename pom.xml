@@ -36,7 +36,7 @@
          a pure request/response; nothing about it is persisted. -->
     <groupId>eu.wohlben.qits</groupId>
     <artifactId>qits-stt</artifactId>
-    <version>2026.824.212013</version>
+    <version>2026.829.114449</version>
     <packaging>pom</packaging>
     <name>qits-stt</name>
 
@@ -55,6 +55,17 @@
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.34.6</quarkus.platform.version>
         <qits.auth-core.version>2026.817.175344</qits.auth-core.version>
+        <!-- The user-story framework (test scope): TranscriptionBootstrapIT is a userflow, so a
+             `mvn verify` also regenerates service/target/userstories/ — the story's documentation,
+             sequence diagram included. Published out of libs/qits-userflows into the platform's own
+             Maven repository, which is what the `qits-maven` repository below is for; nothing here
+             resolves it from central.
+
+             NO qits-service-mock beside it, unlike the sibling services' rollouts: this context
+             calls no HTTP upstream at all. What a deployment supplies it is disk state — a venv
+             holding the model — so the story's far side is a stand-in PROCESS the IT writes into
+             target/, and there is no service to record. -->
+        <qits.userflows.version>2026.828.153026</qits.userflows.version>
         <qits.maven.repository.url>http://registry.dev.localhost:8080/artifacts/maven/maven</qits.maven.repository.url>
 
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
@@ -65,10 +76,13 @@
         <!-- Surefire's @{argLine} has no value unless something (jacoco/quarkus) sets it. -->
         <argLine/>
 
-        <!-- Integration tests run against a PACKAGED artifact, so a plain `mvn verify` — which
-             produces the fast-jar — skips them; `service`'s `native` profile flips this to false so
-             a `-Dnative` build exercises the binary it just compiled. Same default the gateway
-             carries. -->
+        <!-- Integration tests run against a PACKAGED artifact. `domain` is a library jar and keeps
+             this default; `service` — the only module that is an application — opts back IN
+             (skipITs=false there, the qits-githost shape), so a plain `mvn verify` boots the
+             packaged app for TranscriptionBootstrapIT. Deliberately, because that IT is also the
+             generator of the userstories documentation, and because it is the only IT there is: no
+             docker, no database, no network, and a /bin/sh child process, so there is no heavyweight
+             sibling for the flip to drag into somebody's build. -->
         <skipITs>true</skipITs>
     </properties>
 
@@ -86,6 +100,11 @@
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-auth-core</artifactId>
                 <version>${qits.auth-core.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-userflows</artifactId>
+                <version>${qits.userflows.version}</version>
             </dependency>
             <dependency>
                 <groupId>${project.groupId}</groupId>

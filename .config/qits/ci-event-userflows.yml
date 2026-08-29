@@ -1,0 +1,77 @@
+# The per-commit userflow run: `mvn verify` at the pushed commit — which regenerates
+# service/target/userstories/ through TranscriptionBootstrapIT — and the reports published as one
+# docs bundle, site @userflows/qits-stt, version = the bare commit sha, branch riding as artifacts
+# metadata for discovery.
+#
+# NON-GATING BY DESIGN, which is why it is a separate file from ci-post-receive.yml: this run going
+# red must not cost the branch its image while "quality gate before merging" is still a decision to
+# be taken — when it is, these per-commit runs are what the gate reads. One run per push per
+# branch, collapsed to the newest tip under burst.
+#
+# `user: build`, and NOT a switch inside the script. In the sibling files that line is the initdb
+# workaround — zonky's embedded postgres refuses to run as root — and NONE of that applies here:
+# this service owns no tables, has no datasource and the poms name no zonky binaries. It is spelled
+# anyway because it is the fleet's posture for a step that only builds: passwd-backed non-root
+# (maven-base carries one), cap-drop=ALL, no chown and no su available to undo it. Nothing this step
+# runs wants any of those — the suite writes only under `target/`, which the checkout owns.
+#
+# NO PYTHON IN THIS STEP, and that is worth saying out loud in the one repository whose RUNTIME
+# needs one. docker/Dockerfile installs python3.12 because the shipped service spawns a venv; the
+# story does not, and must not: TranscriptionBootstrapIT pre-seeds `qits.speech.home` with a
+# dozen-line /bin/sh stand-in that speaks the worker protocol, so nothing here creates a venv, runs
+# pip, or pulls ~700 MB from the Hugging Face hub. A userflow that needed the real engine would need
+# outbound PyPI and hub access on every commit, and would take minutes.
+#
+# NO QUINOA FLAG, unlike every sibling's copy of this file. `-Dquarkus.quinoa=false` is there to keep
+# a step with an EMPTY webui submodule from failing on it; qits-stt has no webui and no Quinoa
+# extension at all — the browser recorder lives in the monorepo (README.md, "What is deliberately
+# not here"). A flag for an extension this build does not have would only read as if it did.
+#
+# NO IT FLAGS EITHER. This repository opts its ITs back in from the pom (`skipITs` false in
+# service/pom.xml) the way qits-githost and qits-docs do, rather than naming a class here, because
+# TranscriptionBootstrapIT is the ONLY integration test there is: no docker gate, no database, no
+# network, and a /bin/sh child process — nothing a flipped property could drag into somebody's plain
+# `mvn verify`. The surefire half of this run is the same suite a clone already runs.
+#
+# Loop review: this pipeline PUTs a docs bundle and pushes no commit — no cycle. Publish-if-absent:
+# events redeliver and docs versions are immutable, so 409 is success (the qits-spa-ui-components
+# release file's discipline).
+event: SCMPublishCommit
+when:
+  - repoId: { exact: qits-stt }
+    suppressCi: { exact: "false" }
+checkout:
+  branch: branch
+  sha: sha
+steps:
+  - image: qits/build-images/maven-base:latest
+    user: build
+    timeout-seconds: 2400
+    script: |
+      set -eu
+      # The platform registry, exactly as qits-eventstream's step derives it: the pom's default
+      # names a host-published address unreachable from a step container, and the exact-id mirror
+      # in .qits-maven-settings.xml is what passes Maven's HTTP blocker. qits-auth-core has always
+      # come from there; qits-userflows joins it with this rollout.
+      export QITS_MAVEN_REPOSITORY_URL="$QITS_MAVEN_REGISTRY_URL"
+      ./mvnw -B -ntp -s .qits-maven-settings.xml verify \
+        -Dqits.maven.repository.url="$QITS_MAVEN_REPOSITORY_URL"
+
+      # `-C … .` so the story directories are the bundle's roots — nesting one directory deep would
+      # put it in every served URL. The path is service/target/… and not target/…: `service` is the
+      # module that is the application, and the IT lives with it.
+      tar -czf userstories.tgz -C service/target/userstories .
+
+      # Branch and commit ride as metadata (the docs store's exact-match discovery keys); the
+      # version is the sha itself, so a bundle URL never changes meaning.
+      status=$(curl -sS -o /tmp/docs-publish.out -w '%{http_code}' \
+        -X PUT --data-binary @userstories.tgz \
+        -H "X-Artifacts-Meta-git.branch.name: $QITS_CI_BRANCH" \
+        -H "X-Artifacts-Meta-git.commit.hash: $QITS_CI_SHA" \
+        -H "X-Artifacts-Meta-git.repository.name: qits-stt" \
+        "$QITS_DOCS_URL/@userflows/qits-stt/-/$QITS_CI_SHA")
+      case "$status" in
+        201) echo "published userflows for qits-stt@$QITS_CI_SHA ($QITS_CI_BRANCH)" ;;
+        409) echo "userflows for qits-stt@$QITS_CI_SHA already published — skipping" ;;
+        *)   echo "docs publish failed: HTTP $status"; cat /tmp/docs-publish.out; exit 1 ;;
+      esac
