@@ -65,7 +65,7 @@ originals:
 - `stt/control/ProcessExecutor` — from `domain.agent.control`; also copied into the daemon repo.
 
 Treat them as vendored: fix a bug here and it needs fixing in `../qits` too, and vice versa. They
-collapse into `libs/qits-commons` when that exists.
+collapse into a shared `qits-commons` lib when that exists.
 
 `SttExceptionMapper` is *not* one of these — the monorepo's `eu.wohlben.qits.api
 .DomainExceptionMapper` is app-shell code that no target receives, so this is a fresh mapper typed
