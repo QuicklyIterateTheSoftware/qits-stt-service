@@ -9,7 +9,7 @@ import io.quarkus.test.junit.TestProfile;
 import org.junit.jupiter.api.Test;
 
 /**
- * The deployed posture (dev-user fallback blanked): the gateway-injected header is the identity, and
+ * The deployed posture (dev-user fallback blanked): the edge-injected header is the identity, and
  * its absence is anonymous rather than denied.
  *
  * <p>That last point is the one worth stating. Nothing in this service denies anything — there is no

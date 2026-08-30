@@ -18,8 +18,8 @@
          A DEPLOYABLE APP, not a library JAR. It was extracted as a library — "a consuming Quarkus
          application pulls it in and gets the route" — because packaging it would have needed an
          auth variant and a main class. Both reasons have lapsed: authentication terminates at
-         qits-gateway and this module reads a header (see security/), and Quarkus supplies the main
-         class. What remained was a route no process could serve.
+         qits-platform-edge and this module reads a header (qits-auth-core's ForwardAuthMechanism),
+         and Quarkus supplies the main class. What remained was a route no process could serve.
 
          See migration-deployables-plan.md in the superproject. -->
     <artifactId>qits-stt-service</artifactId>
@@ -28,15 +28,17 @@
 
     <properties>
         <!-- THIS MODULE OPTS BACK INTO ITS INTEGRATION TESTS (the root pom's default is true).
-             TranscriptionBootstrapIT is the only IT in the repository and it is cheap: it launches
-             the fast-jar failsafe just packaged, beside a dozen-line /bin/sh stand-in for the
-             resident speech engine that the test writes into target/. No docker, no database, no
-             python, no model download and no network — so it does not compromise the clone-alone
-             rule in AGENTS.md, and there is no heavyweight sibling IT for this flip to drag in.
+             Every IT in the repository is a story class, they all share one @TestProfile so
+             failsafe launches the fast-jar ONCE, and the whole catalogue is cheap: the only child
+             processes are /bin/sh stand-ins the catalogue stages into target/. No docker, no
+             database, no python, no model download and no network — so it does not compromise the
+             clone-alone rule in AGENTS.md, and there is no heavyweight sibling IT for this flip to
+             drag in.
 
-             It also has to be on for the userflows pipeline to have anything to publish: that IT is
-             what emits target/userstories/, and .config/qits/ci-event-userflows.yml runs a plain
-             `mvn verify` rather than naming a class. -->
+             It also has to be on for the userflows pipeline to have anything to publish: those ITs
+             are what emit target/userstories/, and .config/qits/ci-event-userflows.yml runs a plain
+             `mvn verify` rather than naming classes — which is what keeps a new story class from
+             being silently never run. -->
         <skipITs>false</skipITs>
     </properties>
 
@@ -57,10 +59,10 @@
         </dependency>
         <dependency>
             <!-- SecurityIdentity + the HttpAuthenticationMechanism SPI, for the single thing this
-                 service does about auth: read qits-gateway's X-Qits-User header into an identity
-                 (see security/ForwardAuthMechanism). NOT an auth variant and NOT an authorization
+                 service does about auth: read qits-platform-edge's X-Qits-User header into an
+                 identity (ForwardAuthMechanism). NOT an auth variant and NOT an authorization
                  policy — the monolith's -Dqits.variant auth/* modules do not come here at all;
-                 authentication terminates at the gateway (migration-auth-plan.md). -->
+                 authentication terminates at the edge (migration-auth-plan.md). -->
             <groupId>${project.groupId}</groupId>
             <artifactId>qits-auth-core</artifactId>
         </dependency>
@@ -98,10 +100,13 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <!-- The user-story framework: TranscriptionBootstrapIT is written as @UserStory methods,
-                 so the packaged-boot proof doubles as documentation — steps, interactions and a
-                 sequence diagram emitted under target/userstories/. The stories are browserless (an
-                 Interactions parameter and no Flow), so the transitive Playwright never launches
+            <!-- The user-story framework: this module's integration tests are written as @UserStory
+                 methods, so the packaged-boot proof doubles as documentation — steps and a network
+                 diagram emitted under target/userstories/. EVERY edge is observed: the framework's
+                 own NetworkTaps.restAssured sees what arrives here, and stories/support/StoryEngine
+                 reads what the service asked its two child processes for out of the recording those
+                 stand-ins keep. Nothing in the catalogue is declared. The stories are browserless
+                 (an Interactions parameter and no Flow), so the transitive Playwright never launches
                  anything and no browser is needed to run them. Version from the root pom. -->
             <groupId>${project.groupId}</groupId>
             <artifactId>qits-userflows</artifactId>
@@ -168,7 +173,8 @@
     </build>
 
     <profiles>
-        <!-- GraalVM native build (the same profile qits-gateway and qits' workspace-daemon carry):
+        <!-- GraalVM native build (the same profile qits' workspace-daemon and the platform's other
+             native deployables carry):
              `-Dnative` disables the fast-jar and enables the native image. It lives in THIS module,
              not the root pom, because only this module is an application — `domain` is a library jar
              and has nothing to native-compile. skipITs flips with it so a native build runs the

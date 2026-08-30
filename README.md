@@ -45,8 +45,9 @@ it is just not the intended path, and it is worth recognising by name when a bui
 takes 40 seconds starts downloading a container image.
 
 It was extracted as a library on the assumption that some consuming Quarkus application would pull
-it in and gain the route. No such application was ever written, and under the gateway topology none
-will be — so the route had no way to be served and the gateway had nothing to route to.
+it in and gain the route. No such application was ever written, and under the proxy topology that
+replaced it none will be — so the route had no way to be served and the proxy had nothing to route
+to.
 
 ## What it owns
 
@@ -59,8 +60,8 @@ The API is one route:
 
     POST /stt/api/transcriptions   { "audioBase64": "…" } -> { "text": "…" }
 
-Everything this service serves lives under the `/stt` segment — the gateway routes verbatim by
-prefix, so the prefix is part of the address here, not something a proxy adds. `/stt/api` is
+Everything this service serves lives under the `/stt` segment — `qits-platform-edge` routes
+verbatim by prefix, so the prefix is part of the address here, not something a proxy adds. `/stt/api` is
 `quarkus.rest.path`; the framework's own surface (`/stt/q/openapi`, `/stt/q/swagger-ui`) sits under
 `quarkus.http.non-application-root-path`. There is no unprefixed form.
 
@@ -105,8 +106,8 @@ pre-seed `qits.speech.home` with a built venv and a warm HF cache.
   per-service Lit components.
 - **Any workspace or repository awareness.** This context never sees a workspace id. It transcribes
   bytes.
-- **A `main` class or an auth variant.** Quarkus supplies the entrypoint and the gateway owns
-  authentication. The repo has been a deployable since image publishing shipped: every green build
+- **A `main` class or an auth variant.** Quarkus supplies the entrypoint and `qits-platform-edge`
+  owns authentication. The repo has been a deployable since image publishing shipped: every green build
   pushes `qits/qits-stt:<sha>` and qits-cd deploys it.
 
 Integrated by the release flow (AC live proof, maven reactor, 2026-07-31T21:33:42Z).
