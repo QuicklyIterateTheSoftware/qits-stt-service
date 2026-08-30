@@ -1,7 +1,15 @@
 # The per-commit userflow run: `mvn verify` at the pushed commit — which regenerates
-# service/target/userstories/ through TranscriptionBootstrapIT — and the reports published as one
-# docs bundle, site @userflows/qits-stt, version = the bare commit sha, branch riding as artifacts
-# metadata for discovery.
+# service/target/userstories/ through the four @QuarkusIntegrationTest story classes — and the
+# reports published as one docs bundle, site @userflows/qits-stt, version = the bare commit sha,
+# branch riding as artifacts metadata for discovery.
+#
+# THE CATALOGUE, so a reader of this file knows what the bundle holds:
+#
+#   api/TranscriptionBootstrapIT            transcription    a clip end to end, and the six refusals
+#   stories/transcription/ResidentEngineIT  transcription    a second clip is not a second engine
+#   stories/home/SpeechHomeBootstrapIT      the speech home  a volume that was never pre-seeded
+#   stories/engine/EngineFailureIT          the engine       gone, refusing, babbling — and the
+#                                                            respawn each one does or does not cost
 #
 # NON-GATING BY DESIGN, which is why it is a separate file from ci-post-receive.yml: this run going
 # red must not cost the branch its image while "quality gate before merging" is still a decision to
@@ -17,21 +25,31 @@
 #
 # NO PYTHON IN THIS STEP, and that is worth saying out loud in the one repository whose RUNTIME
 # needs one. docker/Dockerfile installs python3.12 because the shipped service spawns a venv; the
-# story does not, and must not: TranscriptionBootstrapIT pre-seeds `qits.speech.home` with a
-# dozen-line /bin/sh stand-in that speaks the worker protocol, so nothing here creates a venv, runs
-# pip, or pulls ~700 MB from the Hugging Face hub. A userflow that needed the real engine would need
-# outbound PyPI and hub access on every commit, and would take minutes.
+# stories do not, and must not: stories/support/StoryEngine stages the whole speech home under
+# target/ and BOTH children in it are /bin/sh — a resident worker at venv/bin/python speaking the
+# worker protocol, and a stand-in host interpreter at host/python3 that records the venv attempt and
+# refuses. So nothing here creates a venv, runs pip, or pulls ~700 MB from the Hugging Face hub. A
+# userflow that needed the real engine would need outbound PyPI and hub access on every commit, and
+# would take minutes.
+#
+# The second stand-in is not belt-and-braces, it is what makes an ABSENCE assertable: every story
+# that transcribes anything pins assertNoEdgesTo("the host python"), and that claim only means
+# something because the binary is right there and would have recorded had it been run.
 #
 # NO QUINOA FLAG, unlike every sibling's copy of this file. `-Dquarkus.quinoa=false` is there to keep
 # a step with an EMPTY webui submodule from failing on it; qits-stt has no webui and no Quinoa
 # extension at all — the browser recorder lives in the monorepo (README.md, "What is deliberately
 # not here"). A flag for an extension this build does not have would only read as if it did.
 #
-# NO IT FLAGS EITHER. This repository opts its ITs back in from the pom (`skipITs` false in
-# service/pom.xml) the way qits-githost and qits-docs do, rather than naming a class here, because
-# TranscriptionBootstrapIT is the ONLY integration test there is: no docker gate, no database, no
-# network, and a /bin/sh child process — nothing a flipped property could drag into somebody's plain
-# `mvn verify`. The surefire half of this run is the same suite a clone already runs.
+# NO IT FLAGS EITHER, AND THAT IS DELIBERATELY DIFFERENT FROM THE SIBLING CATALOGUES. They name
+# their story classes in a `-Dit.test` list here, which means a class added without touching this
+# file is silently never run. This repository opts its ITs back in from the pom (`skipITs` false in
+# service/pom.xml) the way qits-githost and qits-docs do, so `mvn verify` runs EVERY story class
+# there is and a new one is covered the day it is written. It can afford to: every IT here is a
+# story class, they share one @TestProfile so the fast-jar is launched once, and the heaviest thing
+# any of them touches is a /bin/sh child — no docker gate, no database, no network. Nothing a
+# flipped property could drag into somebody's plain `mvn verify`. The surefire half of this run is
+# the same suite a clone already runs.
 #
 # Loop review: this pipeline PUTs a docs bundle and pushes no commit — no cycle. Publish-if-absent:
 # events redeliver and docs versions are immutable, so 409 is success (the qits-spa-ui-components

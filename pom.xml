@@ -36,7 +36,7 @@
          a pure request/response; nothing about it is persisted. -->
     <groupId>eu.wohlben.qits</groupId>
     <artifactId>qits-stt</artifactId>
-    <version>2026.829.140502</version>
+    <version>2026.830.52522</version>
     <packaging>pom</packaging>
     <name>qits-stt</name>
 
@@ -55,17 +55,23 @@
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.34.6</quarkus.platform.version>
         <qits.auth-core.version>2026.817.175344</qits.auth-core.version>
-        <!-- The user-story framework (test scope): TranscriptionBootstrapIT is a userflow, so a
-             `mvn verify` also regenerates service/target/userstories/ — the story's documentation,
-             sequence diagram included. Published out of libs/qits-userflows into the platform's own
+        <!-- The user-story framework (test scope): the five @QuarkusIntegrationTest classes under
+             stt/stories/ (and stt/api/TranscriptionBootstrapIT beside them) are userflows, so a
+             `mvn verify` also regenerates service/target/userstories/ — the stories' documentation,
+             network diagrams included. Published out of libs/qits-userflows into the platform's own
              Maven repository, which is what the `qits-maven` repository below is for; nothing here
              resolves it from central.
 
-             NO qits-service-mock beside it, unlike the sibling services' rollouts: this context
+             NO qits-service-mock beside it, unlike every sibling service's rollout: this context
              calls no HTTP upstream at all. What a deployment supplies it is disk state — a venv
-             holding the model — so the story's far side is a stand-in PROCESS the IT writes into
-             target/, and there is no service to record. -->
-        <qits.userflows.version>2026.828.153026</qits.userflows.version>
+             holding the model — so the far side of every story is a stand-in PROCESS the catalogue
+             stages into target/, and there is no service to record.
+
+             2026.829 is the version that REMOVED Interactions.happened() — an edge is observed or
+             explicitly declared, never narrated — and that SHIPS the RestAssured tap as
+             NetworkTaps.restAssured(service), which is what let the hand-copied StoryNetworkFilter
+             beside the IT be deleted. Do not go back below it: nothing here will compile. -->
+        <qits.userflows.version>2026.829.201516</qits.userflows.version>
         <qits.maven.repository.url>http://registry.dev.localhost:8080/artifacts/maven/maven</qits.maven.repository.url>
 
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
