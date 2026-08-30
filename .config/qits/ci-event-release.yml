@@ -30,7 +30,7 @@
 # not roll.
 event: SCMRelease
 when:
-  - repository: { exact: qits-stt }
+  - repository: { exact: qits-stt-service }
 artifacts:
   - { type: docker, name: qits/qits-stt }
 steps:
