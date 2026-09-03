@@ -36,7 +36,7 @@
          a pure request/response; nothing about it is persisted. -->
     <groupId>eu.wohlben.qits</groupId>
     <artifactId>qits-stt</artifactId>
-    <version>2026.902.144335</version>
+    <version>2026.903.85122</version>
     <packaging>pom</packaging>
     <name>qits-stt</name>
 
@@ -54,7 +54,7 @@
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.34.6</quarkus.platform.version>
-        <qits.auth-core.version>2026.817.175344</qits.auth-core.version>
+        <qits.auth-core.version>2026.902.53026</qits.auth-core.version>
         <!-- The user-story framework (test scope): the five @QuarkusIntegrationTest classes under
              stt/stories/ (and stt/api/TranscriptionBootstrapIT beside them) are userflows, so a
              `mvn verify` also regenerates service/target/userstories/ — the stories' documentation,
@@ -71,7 +71,7 @@
              explicitly declared, never narrated — and that SHIPS the RestAssured tap as
              NetworkTaps.restAssured(service), which is what let the hand-copied StoryNetworkFilter
              beside the IT be deleted. Do not go back below it: nothing here will compile. -->
-        <qits.userflows.version>2026.829.201516</qits.userflows.version>
+        <qits.userflows.version>2026.902.53027</qits.userflows.version>
         <qits.maven.repository.url>http://registry.dev.localhost:8080/artifacts/maven/maven</qits.maven.repository.url>
 
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
