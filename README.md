@@ -107,8 +107,10 @@ pre-seed `qits.speech.home` with a built venv and a warm HF cache.
 - **Any workspace or repository awareness.** This context never sees a workspace id. It transcribes
   bytes.
 - **A `main` class or an auth variant.** Quarkus supplies the entrypoint and `qits-platform-edge`
-  owns authentication. The repo has been a deployable since image publishing shipped: every green build
-  pushes `qits/qits-stt:<sha>` and qits-cd deploys it.
+  owns authentication. The repo has been a deployable since image publishing shipped; what
+  it publishes is a released version — `.config/qits/ci-event-release.yml` pushes
+  `qits/qits-stt:<version>` and qits-cd deploys that coordinate. The per-push `:<sha>` image
+  retired with per-push CI on 2026-09-04.
 
 Integrated by the release flow (AC live proof, maven reactor, 2026-07-31T21:33:42Z).
 Released by the /release door (AJ live proof, 2026-08-01). The event AJ saw was named
