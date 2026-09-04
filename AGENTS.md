@@ -127,8 +127,9 @@ download. Keep the fakes.
 ### The story catalogue, and the worker processes a test may spawn
 
 **Seven `@UserStory` methods over four `@QuarkusIntegrationTest` classes**, emitting
-`service/target/userstories/` and published per commit by `.config/qits/ci-event-userflows.yml` as
-the docs bundle `@userflows/qits-stt`:
+`service/target/userstories/` and published by the userflow half of
+`.config/qits/ci-event-release-request.yml`, once per release-request fold, as the docs bundle
+`@userflows/qits-stt`:
 
     api/TranscriptionBootstrapIT            transcription    a clip transcribed end to end, and the
                                                              six refusals that never wake the engine
@@ -139,9 +140,10 @@ the docs bundle `@userflows/qits-stt`:
     stories/engine/EngineFailureIT          the engine       gone, refusing, and babbling — the three
                                                              failures, and the one respawn each costs
 
-`skipITs` is `false` in `service/pom.xml`, so a plain `mvn verify` runs them all and
-`ci-event-userflows.yml` names no class: a new story class is run the day it is written rather than
-silently never. `docker/Dockerfile` stops at `package`, so the image build is untouched.
+`skipITs` is `false` in `service/pom.xml`, so a plain `mvn verify` runs them all and that half names
+no class: a new story class is run the day it is written rather than silently never. It declares
+`gating: false`, so a red story shows the run red without holding the fold at the release gate.
+`docker/Dockerfile` stops at `package`, so the image build is untouched.
 
 **One `StoryProfile` for the whole catalogue, and that is the point of it.** Every class carries
 `@TestProfile(StoryProfile.class)`, so failsafe launches the fast-jar **once**: one boot, one
