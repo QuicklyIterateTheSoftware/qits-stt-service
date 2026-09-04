@@ -118,3 +118,5 @@ pushes `qits/qits-stt:<version>`; qits-ci turns that green run into `SoftwareRel
 event that means the image exists.
 
 AT: released through the mirror substrate on 2026-08-01.
+
+Released through the new release-request flow on 2026-09-04, verifying the deploy path end to end.
