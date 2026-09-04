@@ -26,6 +26,10 @@ steps:
       # variable stop the step too.
       set -eu
       registry_host="${QITS_REGISTRY%%:*}"
+      # The mirror rides the same host-gateway trick: a bridge-network build container resolves
+      # mirror.dev.localhost to its OWN loopback, so central resolution dies on connection refused
+      # whenever the layer cache is cold (measured 2026-09-04).
+      mirror_host="${QITS_MAVEN_CENTRAL_MIRROR_URL#*://}"; mirror_host="${mirror_host%%[:/]*}"
 
       # The two --secret flags are the fleet's shape for a credential inside a build: the launcher
       # injects the run's commissioned idp client as
@@ -39,6 +43,7 @@ steps:
       ref="$QITS_REGISTRY/$QITS_IMAGE_REPOSITORY/qits-stt:$QITS_CI_SHA"
       docker build \
         --add-host "$registry_host:host-gateway" \
+        ${mirror_host:+--add-host "$mirror_host:host-gateway"} \
         --build-arg QITS_MAVEN_REPOSITORY_URL="http://$QITS_REGISTRY/artifacts/maven/maven" \
         --build-arg QITS_MAVEN_CENTRAL_URL="${QITS_MAVEN_CENTRAL_MIRROR_URL:-}" \
         --secret id=qits-client-id,env=QITS_COMMISSIONED_CLIENT_ID \
