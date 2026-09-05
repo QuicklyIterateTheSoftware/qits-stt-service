@@ -88,6 +88,11 @@ COPY . .
 # qits-auth-core is published in the platform Maven repository. Match that repository by exact id
 # so Maven permits its internal HTTP URL, and expose the CI run's commissioned credential only to
 # this instruction through BuildKit secrets.
+#
+# THE DEFAULT IS A HAND BUILD'S, NOT CI's. The pipelines pass this explicitly, and since the move to
+# the platform builder they pass the registry's IN-NETWORK route ($QITS_MAVEN_REGISTRY_URL): a `RUN`
+# executes in buildkitd's namespace on qits-net, where the edge vhost below does not resolve. The
+# vhost stays the default because a developer's `docker build` on the host is the case it is for.
 ARG QITS_MAVEN_REPOSITORY_URL=http://registry.dev.localhost:8080/artifacts/maven/maven
 ENV QITS_MAVEN_REPOSITORY_URL=$QITS_MAVEN_REPOSITORY_URL
 
@@ -112,8 +117,21 @@ ENV QITS_MAVEN_CENTRAL_URL=$QITS_MAVEN_CENTRAL_URL
 # here proves the same thing more slowly — while importing the known `Port already bound: 8081`
 # @QuarkusTest flake into every image build. Stopping at `package` rather than `verify` also keeps
 # the profile's `skipITs=false` from mattering.
-RUN --mount=type=secret,id=qits-client-id,env=QITS_MAVEN_AUTH_USR \
-    --mount=type=secret,id=qits-client-secret,env=QITS_MAVEN_AUTH_PSW \
+#
+# THE TWO SECRET MOUNTS ARE IN FILE FORM, WHICH IS A CHANGE AND A DELIBERATE ONE. They used to be
+# `env=` mounts, which have the frontend put the value straight into the instruction's environment —
+# convenient, and coupled to a dockerfile-frontend version. Under the platform builder the frontend
+# is the BUILDER's to choose, not this file's, and the bare file mount (`/run/secrets/<id>`, read
+# into the command's own environment) is the shape every frontend version serves identically. Same
+# property either way: the credential is in this `RUN` and nowhere else — not a layer, not the image
+# history, which is why it is never a `--build-arg`. Absent secrets leave both variables empty
+# (`|| true` is every hand build's state), which `.qits-maven-settings.xml` reads exactly as it
+# reads unset — and it reads them as the `qits-maven-network` server, sent only if the registry ever
+# answers 401.
+RUN --mount=type=secret,id=qits-client-id \
+    --mount=type=secret,id=qits-client-secret \
+    QITS_MAVEN_AUTH_USR="$(cat /run/secrets/qits-client-id 2>/dev/null || true)" \
+    QITS_MAVEN_AUTH_PSW="$(cat /run/secrets/qits-client-secret 2>/dev/null || true)" \
     ./mvnw -B -ntp -s .qits-maven-settings.xml -pl service -am package -Dnative -DskipTests \
       -Dqits.maven.repository.url="$QITS_MAVEN_REPOSITORY_URL" \
       -Dquarkus.native.native-image-xmx=4g \
@@ -140,9 +158,9 @@ RUN --mount=type=secret,id=qits-client-id,env=QITS_MAVEN_AUTH_USR \
 # The service module's CycloneDX document, exported so the release step can PUT it to the platform's
 # SBOM store. A stage rather than a layer of the runtime image, and BEFORE the runtime stage on
 # purpose: the last stage is what a plain `docker build` builds, and that must stay the image.
-# `.config/qits/ci-event-release.yml` reaches this one with `--target sbom --output type=local`
-# using the SAME args and secrets as the image build, so every layer above is a cache hit and the
-# export costs seconds rather than a second native compile.
+# `.config/qits/ci-event-release.yml` reaches this one with `--opt target=sbom --output
+# type=local` using the SAME args and secrets as the image build, so every layer above is a cache
+# hit in the same builder and the export costs seconds rather than a second native compile.
 FROM scratch AS sbom
 COPY --from=build /src/service/target/sbom.json /sbom.json
 
