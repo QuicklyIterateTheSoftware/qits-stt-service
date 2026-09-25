@@ -8,10 +8,6 @@
 # branch to deploy from here, in thirteen copies of one platform-wide answer, and it went with the
 # entry-branch promotion and the release door.
 #
-# ENVIRONMENT service: every environment runs its own instance, and a released version deploys into
-# whichever tier the deployment request names.
-deployment_target: environment
-
 # WHAT THIS REPOSITORY DEPLOYS AS, held still across the repository rename. The repository is
 # qits-stt-service now; the application is still qits-stt, so nothing that is running moves: the
 # swarm service and its wire alias, the container, the image qits/qits-stt the build pushes, the
