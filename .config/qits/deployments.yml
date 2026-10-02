@@ -17,8 +17,12 @@
 # rename. Changing the value later is exactly that decommission, so it does not change again.
 application: qits-stt
 
-# The speech API has no browser surface of its own, so it deliberately has no navigation entry.
+# The speech API still has no browser surface of its own, so it still has no navigation entry. But
+# it is no longer reached only by the edge's cross-host path routing — that is being removed. It now
+# has its own host, stt.<domain>, and the workspaces and projects SPAs call it cross-origin there;
+# the edge answers the CORS preflight.
 routes: /stt
+host: stt
 
 # Where the browsable API document lives: swagger-ui under this service's non-application
 # root, which sits under the primary route above. The shell's Api Docs viewer reads it off
