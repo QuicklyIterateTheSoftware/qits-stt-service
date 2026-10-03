@@ -72,7 +72,7 @@
              NetworkTaps.restAssured(service), which is what let the hand-copied StoryNetworkFilter
              beside the IT be deleted. Do not go back below it: nothing here will compile. -->
         <qits.userflows.version>2026.1002.72731</qits.userflows.version>
-        <qits.maven.repository.url>http://registry.dev.localhost:8080/artifacts/maven/maven</qits.maven.repository.url>
+        <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
 
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>

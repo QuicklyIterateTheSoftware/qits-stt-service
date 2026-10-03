@@ -85,24 +85,16 @@ RUN ./mvnw --version
 # already sitting here, and a stale one can shadow what this stage compiles.
 COPY . .
 
-# qits-auth-core is published in the platform Maven repository. Match that repository by exact id
-# so Maven permits its internal HTTP URL, and expose the CI run's commissioned credential only to
-# this instruction through BuildKit secrets.
+# qits-auth-core is published in the platform Maven repository. Both platform hosts are code plus
+# one input, the public domain:
 #
-# THE DEFAULT IS A HAND BUILD'S, NOT CI's. The pipelines pass this explicitly, and since the move to
-# the platform builder they pass the registry's IN-NETWORK route ($QITS_MAVEN_REGISTRY_URL): a `RUN`
-# executes in buildkitd's namespace on qits-net, where the edge vhost below does not resolve. The
-# vhost stays the default because a developer's `docker build` on the host is the case it is for.
-ARG QITS_MAVEN_REPOSITORY_URL=http://registry.dev.localhost:8080/artifacts/maven/maven
-ENV QITS_MAVEN_REPOSITORY_URL=$QITS_MAVEN_REPOSITORY_URL
-
-# --- and where Maven Central is mirrored, when it is ----------------------------------------------
-# The pipeline passes the platform's pull-through (qits-platform-mirror's central proxy, the same
-# authority the FROM lines above pull through); EMPTY — the default — means direct Maven Central.
-# `.qits-maven-settings.xml` activates its central-proxy profile only on a non-empty value, so a
-# bootstrap or hand build that passes nothing resolves exactly as it always did.
-ARG QITS_MAVEN_CENTRAL_URL=
-ENV QITS_MAVEN_CENTRAL_URL=$QITS_MAVEN_CENTRAL_URL
+#   https://registry.qits.$QITS_DOMAIN/artifacts/maven/maven   hosted Maven (qits-artifacts)
+#   https://mirror.qits.$QITS_DOMAIN/mirror/maven/central      Maven Central cache (qits-mirror)
+#
+# The RUN below derives both and exports them for that RUN alone; `.qits-maven-settings.xml` reads
+# them as ${env.…}, mirroring the `qits-maven` repository id onto the first and Central onto the
+# second. The CI recipe passes QITS_DOMAIN; the default is the live platform's.
+ARG QITS_DOMAIN=wohlben.eu
 
 # `-pl service -am` names the APP, which is stable; it is not a module list and does not need
 # editing when a module is added. (It is also not free to omit here the way qits-artifacts omits it:
@@ -132,6 +124,8 @@ RUN --mount=type=secret,id=qits-client-id \
     --mount=type=secret,id=qits-client-secret \
     QITS_MAVEN_AUTH_USR="$(cat /run/secrets/qits-client-id 2>/dev/null || true)" \
     QITS_MAVEN_AUTH_PSW="$(cat /run/secrets/qits-client-secret 2>/dev/null || true)" \
+    QITS_MAVEN_REPOSITORY_URL="https://registry.qits.$QITS_DOMAIN/artifacts/maven/maven" \
+    QITS_MAVEN_CENTRAL_URL="https://mirror.qits.$QITS_DOMAIN/mirror/maven/central" \
     ./mvnw -B -ntp -s .qits-maven-settings.xml -pl service -am package -Dnative -DskipTests \
       -Dqits.maven.repository.url="$QITS_MAVEN_REPOSITORY_URL" \
       -Dquarkus.native.native-image-xmx=4g \
