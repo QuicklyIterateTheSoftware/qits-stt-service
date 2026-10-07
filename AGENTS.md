@@ -94,7 +94,8 @@ nothing, because reaching this service at all already implies you are inside the
 
 There is no auth variant to select in this service. The shared `qits-auth-core` resolves both
 `X-Qits-User` and `X-Qits-Roles`, and the one REST boundary there is uses Jakarta
-`@RolesAllowed("qits:admin")`.
+`@RolesAllowed("qits:admin")`. `qits:admin-agent` — an admin workspace's own coding-agent container —
+is admitted everywhere `qits:admin` is, including here (qits-628 follow-up).
 
 **And there is no machine door at all.** This repository has no `quarkus-oidc` extension, no
 `quarkus.oidc.*` block and no `qits.auth.machine.*` key of its own, so a bearer token is not a
