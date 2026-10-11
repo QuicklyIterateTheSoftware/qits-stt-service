@@ -55,6 +55,10 @@
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.34.6</quarkus.platform.version>
         <qits.auth-core.version>2026.1002.70617</qits.auth-core.version>
+        <!-- CallerServerFilter/CallerClientFilter: jandex-indexed filters that record inbound
+             X-Qits-Caller as the qits.caller span attribute and stamp it on outgoing REST-client
+             calls. Also published by qits-integrations-quarkus. -->
+        <qits.http-core.version>0-qits-1198-local</qits.http-core.version>
         <!-- The user-story framework (test scope): the five @QuarkusIntegrationTest classes under
              stt/stories/ (and stt/api/TranscriptionBootstrapIT beside them) are userflows, so a
              `mvn verify` also regenerates service/target/userstories/ — the stories' documentation,
@@ -106,6 +110,14 @@
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-auth-core</artifactId>
                 <version>${qits.auth-core.version}</version>
+            </dependency>
+            <dependency>
+                <!-- CallerServerFilter: having the jar on the deployable's classpath records
+                     inbound X-Qits-Caller as the qits.caller span attribute. Compile scope in
+                     `service` only; this repo builds no HttpClient of its own. -->
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-http-core</artifactId>
+                <version>${qits.http-core.version}</version>
             </dependency>
             <dependency>
                 <groupId>${project.groupId}</groupId>
