@@ -46,6 +46,7 @@ paths:
       - SecurityScheme:
         - qits:admin
         - qits:admin-agent
+        - qits:desk
 info:
   title: qits-stt API
   version: 2026.812.171728
