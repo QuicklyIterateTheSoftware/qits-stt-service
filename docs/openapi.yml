@@ -46,6 +46,7 @@ paths:
       - SecurityScheme:
         - qits:admin
         - qits:admin-agent
+        - qits:desk-admin
         - qits:desk
 info:
   title: qits-stt API

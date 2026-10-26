@@ -24,6 +24,9 @@ import org.junit.jupiter.api.Test;
  * — so the desk is admitted outright, the same way {@code qits:admin-agent} is, rather than bound
  * to a project claim.
  *
+ * <p>Epic qits-1621 extends it again to {@code qits:desk-admin}: a platform operator role,
+ * admitted everywhere {@code qits:admin-agent} is, this door included.
+ *
  * <p>Neither case needs a real transcription: a request the door admits still reaches the base64
  * decode and fails there with this context's own 400, which is enough to prove the role gate let it
  * through without waking the engine; a request the door refuses never gets that far.
@@ -55,6 +58,22 @@ class SpeechControllerRoleAccessTest {
     given()
         .header("X-Qits-User", "the-desk")
         .header("X-Qits-Roles", "qits:desk")
+        .contentType(ContentType.JSON)
+        .body(Map.of("audioBase64", NOT_BASE64))
+        .when()
+        .post("/stt/api/transcriptions")
+        .then()
+        // Same proof as the admin-agent case above: past the door, into the method, and failing
+        // on the decode rather than on the role gate.
+        .statusCode(Response.Status.BAD_REQUEST.getStatusCode())
+        .body("message", equalTo("audioBase64 is not valid base64"));
+  }
+
+  @Test
+  void deskAdminAloneIsAdmittedToTheWriteDoor() {
+    given()
+        .header("X-Qits-User", "the-desk-admin")
+        .header("X-Qits-Roles", "qits:desk-admin")
         .contentType(ContentType.JSON)
         .body(Map.of("audioBase64", NOT_BASE64))
         .when()

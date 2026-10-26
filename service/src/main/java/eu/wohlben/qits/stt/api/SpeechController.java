@@ -20,7 +20,12 @@ import java.util.Base64;
 @Path("/transcriptions")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-@jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:admin-agent", "qits:desk"})
+@jakarta.annotation.security.RolesAllowed({
+  "qits:admin",
+  "qits:admin-agent",
+  "qits:desk-admin",
+  "qits:desk"
+})
 public class SpeechController {
 
   @Inject TranscriptionService transcriptionService;
