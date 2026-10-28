@@ -75,7 +75,7 @@
              explicitly declared, never narrated — and that SHIPS the RestAssured tap as
              NetworkTaps.restAssured(service), which is what let the hand-copied StoryNetworkFilter
              beside the IT be deleted. Do not go back below it: nothing here will compile. -->
-        <qits.userflows.version>2026.1002.72731</qits.userflows.version>
+        <qits.userflows.version>2026.1028.231715</qits.userflows.version>
         <!-- The platform's shared ArchUnit rules (test scope), carrying DeskAdminParityRules —
              epic qits-1621's check that every route admitting qits:admin-agent also admits
              qits:desk-admin. This repo did not depend on qits-arch-rules before. -->
