@@ -28,3 +28,9 @@ host: stt
 # root, which sits under the primary route above. The shell's Api Docs viewer reads it off
 # /main-navigation and frames it for this repository.
 api-docs: /stt/q/swagger-ui
+
+# THE SPEECH HOME'S VOLUME (qits-1391): the venv and the ~700 MB model cache the image points
+# QITS_SPEECH_HOME and HF_HOME at (/data/speech, see docker/Dockerfile), kept across a recreate. A
+# private volume is named `<application>-<name>`, so this is `qits-stt-data` — the volume the
+# service already runs on; the deployer drops the config mount of the same target.
+volumes: private:data:/data
