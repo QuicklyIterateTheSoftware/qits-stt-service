@@ -1,4 +1,6 @@
 archetype: java-service
 artifacts:
-  - { type: docker, name: qits/qits-stt, sbom: .sbom/sbom.json }
+  - { type: docker, name: qits/qits-speech, sbom: .sbom/sbom.json }
+# qits-766: userflows stays qits-stt on purpose, to keep the @userflows/qits-stt bundle's history
+# through the live rename test rather than starting a fresh @userflows/qits-speech with none.
 userflows: qits-stt

@@ -15,7 +15,24 @@
 # container boots with all keep the names they have. Omitted, this name would be DERIVED from the
 # repository, and the rename would read as a decommission plus a new application rather than a
 # rename. Changing the value later is exactly that decommission, so it does not change again.
-application: qits-stt
+application: qits-speech
+
+# qits-766's LIVE RENAME TEST: this application is being renamed from qits-stt to qits-speech on
+# the running platform, to prove the deployer's rename cutover (AGENTS.md, qits-deployments-service)
+# end to end rather than in a story. `renamed_from:` moves the predecessor's postgres claims (none
+# here) and settings, follows it with the old wire address as an alias, and retires `qits-stt` once
+# `qits-speech` is live — all of which this file now exercises for real. It will be renamed back
+# once the test is done, at which point this line and the comment above both go.
+renamed_from: qits-stt
+
+# THE HEALTH PATH DOES NOT FOLLOW THE RENAME BY ITSELF, AND THAT IS THE TRAP. `resolveHealthPath`
+# falls back to `DeployService.conventionHealthPath(applicationName)` — derived from the
+# APPLICATION name, never the repository's — which for `qits-speech` would derive
+# `/speech/q/health/ready`. This service's actual route is still `/stt` (`routes:` and
+# `quarkus.rest.path` below are both unchanged), so the derived path would 404 and the health gate
+# would fail a container that is perfectly healthy. Pinning the path this repository already serves
+# keeps the probe correct through the rename.
+health_path: /stt/q/health/ready
 
 # The speech API still has no browser surface of its own, so it still has no navigation entry. But
 # it is no longer reached only by the edge's cross-host path routing — that is being removed. It now
@@ -31,6 +48,8 @@ api-docs: /stt/q/swagger-ui
 
 # THE SPEECH HOME'S VOLUME (qits-1391): the venv and the ~700 MB model cache the image points
 # QITS_SPEECH_HOME and HF_HOME at (/data/speech, see docker/Dockerfile), kept across a recreate. A
-# private volume is named `<application>-<name>`, so this is `qits-stt-data` — the volume the
-# service already runs on; the deployer drops the config mount of the same target.
+# private volume is named `<application>-<name>`, so renaming the application to qits-speech above
+# makes this `qits-speech-data` — a FRESH, empty volume: the model cache is re-created from
+# scratch on the successor's first boot. `qits-stt-data` is left behind, holding everything it had,
+# for the rename back (qits-766 live rename test).
 volumes: private:data:/data
