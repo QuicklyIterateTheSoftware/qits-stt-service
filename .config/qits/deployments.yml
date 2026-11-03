@@ -49,3 +49,12 @@ api-docs: /stt/q/swagger-ui
 # service ran on before the qits-766 rename test, kept while it was `qits-speech` (whose
 # `qits-speech-data` is now left behind). A rename does not move a private volume.
 volumes: private:data:/data
+
+# idp:client ASKS QITS-DEPLOYMENTS TO PROVISION THIS APPLICATION'S OWN QITS-IDP SERVICE CLIENT — id
+# `<env>-qits-stt` (derived from env + application), roles fixed in qits-idp code. The deployer
+# stores the secret and injects QITS_RESOURCE_IDP_URL, QITS_RESOURCE_IDP_CLIENT_ID and
+# QITS_RESOURCE_IDP_CLIENT_SECRET, which the `qits` oidc client in application.properties reads. It
+# is the bearer qits-telemetry-core attaches to every OTLP export, now that this service ships its
+# telemetry to qits-observability's edge host, where the edge refuses an anonymous request (epic
+# qits-428). Validating the bearers callers present needs no resource; presenting one does.
+resources: idp:client

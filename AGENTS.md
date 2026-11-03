@@ -85,8 +85,20 @@ carries the same `quarkus-oidc` tenant every other qits-auth-core service does: 
 deployment and off under `%dev`/`%test`, bearer only (`application-type=service`), discovery at
 `https://idp.qits.${QITS_DOMAIN}/idp` (the idp through the edge, never a wire alias — owner ruling on
 qits-533), keys fetched by `kid` on the first bearer rather than at boot, and the one platform
-audience `qits-platform`. The token's `groups` become the identity's roles. No `deployments.yml`
-resource is involved: validating a token needs no idp client of this service's own.
+audience `qits-platform`. The token's `groups` become the identity's roles. Validating a token
+needs no idp client of this service's own.
+
+**Presenting one does** (epic qits-428). The `idp:client` resource in `.config/qits/deployments.yml`
+commissions this application's own qits-idp service client, injected as `QITS_RESOURCE_IDP_URL` /
+`_CLIENT_ID` / `_CLIENT_SECRET`, and the named oidc client `quarkus.oidc-client.qits` mints a
+`qits:system` bearer from it by client credentials. Its one reader is qits-telemetry-core, whose
+OTLP exporters attach it to every export: telemetry goes to qits-observability at its edge host,
+`https://observability.qits.<QITS_DOMAIN>/observability/api/otel` (the module's default for
+`qits.telemetry.endpoint`), and the edge refuses an anonymous POST. `qits.observability.url` and
+`quarkus.otel.exporter.otlp.*` are gone. The client is off under `%dev`/`%test`;
+`telemetry/QitsClientMintTest` runs the mint through it against a stand-in token endpoint, and
+`telemetry/OtelLogConfigTest` pins the exporter keys. No pact: this repository writes no consumer
+pacts.
 
 **Why it changed.** This section used to say there was no machine door at all: a person reached
 the route through the edge, which stripped `X-Qits-*` from every inbound request and re-asserted
@@ -249,7 +261,8 @@ than none.
 
 **What is deliberately NOT drawn, and why the diagram is honest to leave it out.** Two real
 dependencies of a deployed qits-stt appear in no story: the model pull from the Hugging Face hub on
-the engine's first-ever start, and the OTLP export to qits-observability. The first is prevented by
+the engine's first-ever start, and the OTLP export to qits-observability (with the idp token mint
+that authorises it). The first is prevented by
 the pre-seeded home; the second is off (`quarkus.otel.sdk.disabled` in the profile), because a
 batched, timer-driven export would land in whichever story happened to be open when it fired.
 Neither is declared. **A declared edge for traffic a run deliberately prevented is exactly the
