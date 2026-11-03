@@ -3,9 +3,8 @@ package eu.wohlben.qits.stt.api;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 
-import eu.wohlben.qits.stt.security.NoDevUserProfile;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
+import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
 import jakarta.ws.rs.core.Response;
 import java.util.Map;
@@ -14,10 +13,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Pins qits-628's rule at this service's one door: {@code qits:admin-agent} must be admitted
  * everywhere {@code qits:admin} is, stated explicitly beside it rather than inherited from any
- * augmentor or prefix match. The dev-user fallback is blanked ({@link NoDevUserProfile}, the same
- * profile {@code ForwardAuthTest} uses) so the forwarded header is the only identity — without it
- * every {@code @QuarkusTest} here arrives with an automatic {@code qits:admin} (see
- * {@code TranscriptionBootstrapIT}'s javadoc) and the door could never be seen refusing anybody.
+ * augmentor or prefix match. Each test names exactly one role with {@code @TestSecurity}, so the
+ * identity holds that role and nothing else, and the door can be seen refusing somebody.
  *
  * <p>qits-1596 extends the same rule to the delivery desk ({@code qits:desk}): a transcription
  * request carries nothing to scope — {@code TranscribeRequest} has no workspace or repository id
@@ -32,16 +29,14 @@ import org.junit.jupiter.api.Test;
  * through without waking the engine; a request the door refuses never gets that far.
  */
 @QuarkusTest
-@TestProfile(NoDevUserProfile.class)
 class SpeechControllerRoleAccessTest {
 
   private static final String NOT_BASE64 = "!!! not base64 !!!";
 
   @Test
+  @TestSecurity(user = "alice", roles = "qits:admin-agent")
   void adminAgentAloneIsAdmittedToTheWriteDoor() {
     given()
-        .header("X-Qits-User", "alice")
-        .header("X-Qits-Roles", "qits:admin-agent")
         .contentType(ContentType.JSON)
         .body(Map.of("audioBase64", NOT_BASE64))
         .when()
@@ -54,10 +49,9 @@ class SpeechControllerRoleAccessTest {
   }
 
   @Test
+  @TestSecurity(user = "the-desk", roles = "qits:desk")
   void deskAloneIsAdmittedToTheWriteDoor() {
     given()
-        .header("X-Qits-User", "the-desk")
-        .header("X-Qits-Roles", "qits:desk")
         .contentType(ContentType.JSON)
         .body(Map.of("audioBase64", NOT_BASE64))
         .when()
@@ -70,10 +64,9 @@ class SpeechControllerRoleAccessTest {
   }
 
   @Test
+  @TestSecurity(user = "the-desk-admin", roles = "qits:desk-admin")
   void deskAdminAloneIsAdmittedToTheWriteDoor() {
     given()
-        .header("X-Qits-User", "the-desk-admin")
-        .header("X-Qits-Roles", "qits:desk-admin")
         .contentType(ContentType.JSON)
         .body(Map.of("audioBase64", NOT_BASE64))
         .when()
@@ -86,13 +79,12 @@ class SpeechControllerRoleAccessTest {
   }
 
   @Test
+  @TestSecurity(user = "alice", roles = "qits:agent")
   void plainAgentWithoutAdminOrAdminAgentStillGets403() {
     // qits:agent is the ordinary agent credential — never admitted by this admin-only door, and
     // worth its own case precisely because it is the role an admin-agent identity is NOT: this
     // proves admitting qits:admin-agent did not widen the door to agents in general.
     given()
-        .header("X-Qits-User", "alice")
-        .header("X-Qits-Roles", "qits:agent")
         .contentType(ContentType.JSON)
         .body(Map.of("audioBase64", NOT_BASE64))
         .when()

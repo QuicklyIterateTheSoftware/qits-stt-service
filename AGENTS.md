@@ -107,10 +107,22 @@ than assumed: the refusal story sends a bearer and pins the 401. Adding a machin
 decision, and it starts with the `quarkus.oidc.*` block every validator carries.
 
 **`X-Qits-*` is the edge's reserved namespace, stripped from every inbound request
-unconditionally**, so a client cannot forge one. That strip rule is the entire reason the header can
-be trusted here — and it is why `ForwardAuthTest` sets the real header rather than reaching for
-`@TestSecurity`. The header *is* the contract under test; a test that mocked the identity instead
-would pass just as happily against a mechanism that never reads it.
+unconditionally**, so a client cannot forge one.
+
+**Forward-auth is leaving (epic qits-543): qits-1338 removes `ForwardAuthMechanism` and the
+`%dev`/`%test` dev user from qits-auth-core.** The `@QuarkusTest` suite already runs without them: a
+test names its identity with `@TestSecurity` and the roles it means, and
+`src/test/resources/application.properties` blanks the dev user and renames the forward headers
+(`%test.qits.auth.forward.*`, which go with qits-1338), so a header-less request is anonymous and a
+stray `X-Qits-User` authenticates nothing. `ForwardedHeadersIgnoredTest` is the one `@QuarkusTest`
+that sends the headers, to prove exactly that. The story catalogue still sends them: a packaged
+launch has no `@TestSecurity`, and with no `quarkus-oidc` tenant (above) the forwarded headers are
+the only way in this service has today.
+
+**Dev mode needs a bearer once qits-1338 lands**, because the `%dev` dev user goes with it — for
+example `curl -H "Authorization: Bearer $(qits-token qits-platform)" ...` or the `qits` CLI. Until
+this service grows the `quarkus.oidc.*` block that validates one, that bearer is a header nothing
+reads, so `quarkus:dev` answers 401 on the transcription route.
 
 ## Tests
 
@@ -172,8 +184,8 @@ a deployment that cannot reach PyPI or the Hugging Face hub pre-seeds the volume
 
 Why they earn their place, given the fakes above: **the packaged posture is the only one where the
 door and the process plumbing are real.** `@RolesAllowed("qits:admin")` is invisible to every
-`@QuarkusTest` here, because qits-auth-core's `%test` dev-user hands each one a `qits:admin`
-identity and `ForwardAuthMechanism` only ignores that fallback under `LaunchMode.NORMAL`; and
+`@QuarkusTest` here, because each one names its identity with `@TestSecurity` rather than meeting
+the shipped mechanism; and
 `TranscriptionServiceTest` replaces `ProcessExecutor`/`SpeechWorker` with CDI fakes, so the real
 `ProcessBuilder`, the greeting handshake, the respawn-once policy and the staged WAV's deletion
 never execute. Do not "fix" a story by mocking either half — that is what the surefire suite is for.

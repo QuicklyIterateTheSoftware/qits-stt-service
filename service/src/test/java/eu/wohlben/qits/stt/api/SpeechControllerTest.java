@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.equalTo;
 
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
 import jakarta.ws.rs.core.Response;
 import java.util.HashMap;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
  * the suite never needs python or the parakeet model.
  */
 @QuarkusTest
+@TestSecurity(user = "operator", roles = "qits:admin")
 public class SpeechControllerTest {
 
   @Test
