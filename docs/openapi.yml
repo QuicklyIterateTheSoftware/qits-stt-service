@@ -17,6 +17,11 @@ components:
         audioBase64:
           type: string
           pattern: \S
+  securitySchemes:
+    SecurityScheme:
+      type: openIdConnect
+      openIdConnectUrl: https://idp.qits.wohlben.eu/idp/.well-known/openid-configuration
+      description: Authentication
 paths:
   /stt/api/transcriptions:
     post:

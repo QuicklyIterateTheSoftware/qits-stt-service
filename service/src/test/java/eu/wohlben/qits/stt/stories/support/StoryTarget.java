@@ -1,5 +1,7 @@
 package eu.wohlben.qits.stt.stories.support;
 
+import eu.wohlben.qits.stt.security.BearerTokens;
+
 /**
  * The names and addresses every story in this catalogue shares — spelled once, so a diagram and the
  * assertion that pins it cannot disagree about what a thing is called.
@@ -29,12 +31,11 @@ public final class StoryTarget {
   public static final String READY = "/stt/q/health/ready";
 
   /**
-   * Who a real transcription arrives from. It is <b>qits-platform-edge</b> and it read {@code
+   * Who a real transcription arrives through. It is <b>qits-platform-edge</b> and it read {@code
    * qits-gateway} until this migration: that service no longer exists — the edge replaced the whole
-   * gateway tier — and a diagram naming a node nobody can deploy is worse than no diagram. Nothing
-   * about the request changed with the rename: {@code X-Qits-User} / {@code X-Qits-Roles} are still
-   * the reserved namespace the proxy strips from every inbound request and re-asserts for a
-   * signed-in operator, which is the entire reason this service may trust them.
+   * gateway tier — and a diagram naming a node nobody can deploy is worse than no diagram. The edge
+   * asserts no identity any more (epic qits-543, qits-1373): the operator's browser sends its own
+   * qits-idp bearer through it, and this service checks that bearer itself (qits-1370).
    */
   public static final String EDGE = "qits-platform-edge";
 
@@ -50,6 +51,19 @@ public final class StoryTarget {
 
   /** The operator every story that gets past the door arrives as. */
   public static final String USER = "alice";
+
+  /**
+   * The {@code Authorization} value of a signed-in operator holding {@link #ADMIN_ROLE}: a person's
+   * qits-idp bearer, signed with the suite's key, which {@link StoryProfile} hands the tenant.
+   */
+  public static String adminBearer() {
+    return BearerTokens.bearer(BearerTokens.personToken(ADMIN_ROLE));
+  }
+
+  /** The same operator's bearer holding only {@link #READER_ROLE}. */
+  public static String readerBearer() {
+    return BearerTokens.bearer(BearerTokens.personToken(READER_ROLE));
+  }
 
   /** The transcript the stand-in engine answers with — the payload that has to survive the trip. */
   public static final String TRANSCRIPT = "the release train leaves at nine";

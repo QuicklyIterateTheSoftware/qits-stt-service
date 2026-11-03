@@ -79,50 +79,50 @@ adding a datasource is not a routine change in this repo.
 
 ## Authentication
 
-Authentication happens at `qits-platform-edge`. This service resolves a principal from a trusted
-header (`X-Qits-User`, read by qits-auth-core's `ForwardAuthMechanism`) and authenticates nothing.
+**This service validates the caller's qits-idp bearer itself** (epic qits-543, qits-1370). It
+carries the same `quarkus-oidc` tenant every other qits-auth-core service does: the
+`quarkus.oidc.*` block in `service/src/main/resources/application.properties` — tenant on in a
+deployment and off under `%dev`/`%test`, bearer only (`application-type=service`), discovery at
+`https://idp.qits.${QITS_DOMAIN}/idp` (the idp through the edge, never a wire alias — owner ruling on
+qits-533), keys fetched by `kid` on the first bearer rather than at boot, and the one platform
+audience `qits-platform`. The token's `groups` become the identity's roles. No `deployments.yml`
+resource is involved: validating a token needs no idp client of this service's own.
 
-**The name matters and it changed.** This section read `qits-gateway` until the 2026.829 userflows
-rollout. That service no longer exists — the edge replaced the whole gateway tier and is now the
-only proxy in front of anything — so a document naming it sends a reader looking for a deployment
-nobody can make. The *contract* is unchanged in every particular: same headers, same strip rule,
-same reason to trust them.
+**Why it changed.** This section used to say there was no machine door at all: a person reached
+the route through the edge, which stripped `X-Qits-*` from every inbound request and re-asserted
+`X-Qits-User` / `X-Qits-Roles` for a signed-in operator, and qits-auth-core's `ForwardAuthMechanism`
+read them. Epic qits-543 removes every part of that: browsers sign in with idp tokens and send
+`Authorization: Bearer` (qits-1340), the edge stops asserting identity (qits-1373), and
+forward-auth leaves qits-auth-core (qits-1338). Without the tenant nobody could reach this service.
+A forwarded `X-Qits-*` pair is now a header nothing believes.
 
-**`identity.isAnonymous()` is not a security state** — it means "no name for the audit row". A check
-of the form `if (identity.isAnonymous()) deny` would look like a security control and be worth
-nothing, because reaching this service at all already implies you are inside the trusted network.
+The one REST boundary uses Jakarta `@RolesAllowed("qits:admin")`, unchanged. `qits:admin-agent` — an
+admin workspace's own coding-agent container — is admitted everywhere `qits:admin` is, including
+here (qits-628 follow-up), and so is `qits:desk-admin` (epic qits-1621), wherever
+`qits:admin-agent` is. A request with no bearer is anonymous and challenged (401); a bearer that does
+not validate — a foreign signature, another audience, another issuer — is 401; a valid bearer
+without the role is 403.
 
-There is no auth variant to select in this service. The shared `qits-auth-core` resolves both
-`X-Qits-User` and `X-Qits-Roles`, and the one REST boundary there is uses Jakarta
-`@RolesAllowed("qits:admin")`. `qits:admin-agent` — an admin workspace's own coding-agent container —
-is admitted everywhere `qits:admin` is, including here (qits-628 follow-up), and so is
-`qits:desk-admin` (epic qits-1621), wherever `qits:admin-agent` is.
+**`identity.isAnonymous()` is not a security state** — it means "no name for the audit row". The
+door is `@RolesAllowed`; do not add a check of the form `if (identity.isAnonymous()) deny` beside it.
 
-**And there is no machine door at all.** This repository has no `quarkus-oidc` extension, no
-`quarkus.oidc.*` block and no `qits.auth.machine.*` key of its own, so a bearer token is not a
-credential here — it is a header nothing reads, and a request carrying one and nothing else is a
-401 like any other stranger. That is a deliberate shape rather than an omission (a transcription is
-something an operator asks for, through the edge, like any other person), and it is asserted rather
-than assumed: the refusal story sends a bearer and pins the 401. Adding a machine door is a design
-decision, and it starts with the `quarkus.oidc.*` block every validator carries.
-
-**`X-Qits-*` is the edge's reserved namespace, stripped from every inbound request
-unconditionally**, so a client cannot forge one.
-
-**Forward-auth is leaving (epic qits-543): qits-1338 removes `ForwardAuthMechanism` and the
-`%dev`/`%test` dev user from qits-auth-core.** The `@QuarkusTest` suite already runs without them: a
-test names its identity with `@TestSecurity` and the roles it means, and
+**How the tests name their caller.** The `@QuarkusTest` suite runs with the tenant off and without
+forward-auth: a test names its identity with `@TestSecurity` and the roles it means, and
 `src/test/resources/application.properties` blanks the dev user and renames the forward headers
 (`%test.qits.auth.forward.*`, which go with qits-1338), so a header-less request is anonymous and a
 stray `X-Qits-User` authenticates nothing. `ForwardedHeadersIgnoredTest` is the one `@QuarkusTest`
-that sends the headers, to prove exactly that. The story catalogue still sends them: a packaged
-launch has no `@TestSecurity`, and with no `quarkus-oidc` tenant (above) the forwarded headers are
-the only way in this service has today.
+that sends the headers, to prove exactly that. `security/BearerAuthTest` turns the shipped tenant
+back on (`BearerAuthProfile`: the suite's local verification key in place of discovery) and pins the
+door: a person's bearer is the identity, a wrong audience or an untrusted key is 401. The story
+catalogue presents real signed bearers (`security/BearerTokens`, `StoryTarget.adminBearer()`), and
+`StoryProfile` hands the packaged tenant the same key; it also renames the forward headers in the
+launched process, so the refusal story can pin that a forged pair alone is 401 before qits-1338 lands
+(those two keys go with it). The key pair under `src/test/resources` exists for this suite only and
+protects nothing.
 
-**Dev mode needs a bearer once qits-1338 lands**, because the `%dev` dev user goes with it — for
-example `curl -H "Authorization: Bearer $(qits-token qits-platform)" ...` or the `qits` CLI. Until
-this service grows the `quarkus.oidc.*` block that validates one, that bearer is a header nothing
-reads, so `quarkus:dev` answers 401 on the transcription route.
+**Dev mode needs a bearer**, because the `%dev` dev user goes with qits-1338 — for example
+`curl -H "Authorization: Bearer $(qits-token qits-platform)" ...` or the `qits` CLI — with the
+tenant switched back on (`-Dquarkus.oidc.tenant-enabled=true`; the shipped `%dev` turns it off).
 
 ## Tests
 
@@ -146,7 +146,7 @@ download. Keep the fakes.
 `@userflows/qits-stt`:
 
     api/TranscriptionBootstrapIT            transcription    a clip transcribed end to end, and the
-                                                             six refusals that never wake the engine
+                                                             seven refusals that never wake the engine
     stories/transcription/ResidentEngineIT  transcription    why this is a service: a second clip is
                                                              not a second engine
     stories/home/SpeechHomeBootstrapIT      the speech home  a volume that was never pre-seeded, and
@@ -183,9 +183,9 @@ a resident worker at `venv/bin/python` speaking the worker protocol, and a host 
 a deployment that cannot reach PyPI or the Hugging Face hub pre-seeds the volume.
 
 Why they earn their place, given the fakes above: **the packaged posture is the only one where the
-door and the process plumbing are real.** `@RolesAllowed("qits:admin")` is invisible to every
-`@QuarkusTest` here, because each one names its identity with `@TestSecurity` rather than meeting
-the shipped mechanism; and
+door and the process plumbing are real.** `@RolesAllowed("qits:admin")` behind a real signed bearer
+is met by `security/BearerAuthTest` and by no other `@QuarkusTest` here, because each one names its
+identity with `@TestSecurity` rather than meeting the shipped mechanism; and
 `TranscriptionServiceTest` replaces `ProcessExecutor`/`SpeechWorker` with CDI fakes, so the real
 `ProcessBuilder`, the greeting handshake, the respawn-once policy and the staged WAV's deletion
 never execute. Do not "fix" a story by mocking either half — that is what the surefire suite is for.
@@ -243,7 +243,7 @@ story, which means something now that the engine is a node other stories genuine
 that one is the sharpest, because `qits.speech.python` points at a **recording stand-in that exists** rather than
 (as the first rollout had it) a path that cannot. "No venv was built and nothing reached PyPI" is a
 claim with a witness only because the binary that would have done it is right there and records.
-`assertNotLeaked` covers every generated staging id and the bearer the refusal story sends. An
+`assertNotLeaked` covers every generated staging id and the untrusted bearer the refusal story sends. An
 absence is a step and never an edge: an arrow that meant its own opposite would be a worse document
 than none.
 
@@ -270,7 +270,7 @@ Never re-declare an app-level setting in test resources. A second copy does not 
 safer, it makes it lie: the run goes green because the *test* copy is right, so a wrong or missing
 value in the shipped copy — the one that actually reaches a deployment — passes unnoticed. Test
 resources are for genuine test-only overrides, and a real override belongs in a `@TestProfile`
-next to the test that needs it (see `NoDevUserProfile`, `TranscriptionServiceTest.SpeechTestProfile`,
+next to the test that needs it (see `security/BearerAuthProfile`, `TranscriptionServiceTest.SpeechTestProfile`,
 `stories/support/StoryProfile`) so its scope is visible.
 
 `OpenApiSchemaExportTest` writes `docs/openapi.yml` as a side effect. Regenerate and commit it

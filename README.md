@@ -106,8 +106,9 @@ pre-seed `qits.speech.home` with a built venv and a warm HF cache.
   per-service Lit components.
 - **Any workspace or repository awareness.** This context never sees a workspace id. It transcribes
   bytes.
-- **A `main` class or an auth variant.** Quarkus supplies the entrypoint and `qits-platform-edge`
-  owns authentication. The repo has been a deployable since image publishing shipped; what
+- **A `main` class or an auth variant.** Quarkus supplies the entrypoint, and authentication is
+  the platform's one shape: the caller's qits-idp bearer, checked by the `quarkus-oidc` tenant
+  (qits-1370; see AGENTS.md, "Authentication"). The repo has been a deployable since image publishing shipped; what
   it publishes is a released version — `.config/qits/ci-event-release.yml` pushes
   `qits/qits-stt:<version>` and qits-cd deploys that coordinate. The per-push `:<sha>` image
   retired with per-push CI on 2026-09-04.

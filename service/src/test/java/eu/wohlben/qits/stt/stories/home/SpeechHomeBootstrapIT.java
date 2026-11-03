@@ -124,8 +124,7 @@ public class SpeechHomeBootstrapIT {
 
     NetworkCapture.actor(StoryTarget.EDGE);
     given()
-        .header("X-Qits-User", StoryTarget.USER)
-        .header("X-Qits-Roles", StoryTarget.ADMIN_ROLE)
+        .header("Authorization", StoryTarget.adminBearer())
         .contentType(ContentType.JSON)
         .body(Map.of("audioBase64", StoryClip.base64()))
         .when()
@@ -160,8 +159,7 @@ public class SpeechHomeBootstrapIT {
 
     NetworkCapture.actor(StoryTarget.EDGE);
     given()
-        .header("X-Qits-User", StoryTarget.USER)
-        .header("X-Qits-Roles", StoryTarget.ADMIN_ROLE)
+        .header("Authorization", StoryTarget.adminBearer())
         .contentType(ContentType.JSON)
         .body(Map.of("audioBase64", StoryClip.base64()))
         .when()

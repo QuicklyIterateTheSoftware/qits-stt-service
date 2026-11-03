@@ -1,0 +1,30 @@
+package eu.wohlben.qits.stt.security;
+
+import io.quarkus.test.junit.QuarkusTestProfile;
+import java.util.Map;
+
+/**
+ * The deployed posture for tokens, with a local key in place of a live idp.
+ *
+ * <ul>
+ *   <li>The OIDC tenant goes back on. The shipped file turns it off under {@code %test}.
+ *   <li>{@code quarkus.oidc.public-key} replaces discovery and the key fetch. {@code
+ *       auth-server-url} is cleared beside it, because a tenant that still has a server URL tries to
+ *       reach it on the first bearer.
+ *   <li>{@code quarkus.oidc.token.issuer} stands in for the issuer the idp's discovery document
+ *       publishes: with no server URL there is no discovery to read it from.
+ * </ul>
+ *
+ * <p>Everything else, the audience included, is the shipped configuration.
+ */
+public class BearerAuthProfile implements QuarkusTestProfile {
+
+  @Override
+  public Map<String, String> getConfigOverrides() {
+    return Map.of(
+        "quarkus.oidc.tenant-enabled", "true",
+        "quarkus.oidc.auth-server-url", "",
+        "quarkus.oidc.public-key", BearerTokens.verificationKey(),
+        "quarkus.oidc.token.issuer", BearerTokens.ISSUER);
+  }
+}

@@ -1,5 +1,6 @@
 package eu.wohlben.qits.stt.stories.support;
 
+import eu.wohlben.qits.stt.security.BearerTokens;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import java.nio.file.Path;
 import java.util.Map;
@@ -22,6 +23,13 @@ import java.util.Map;
  * .config/qits/deployments.yml} declares no {@code resources:} and there are no generic triples to
  * supply. The whole of a qits-stt deployment is where its disk state lives.
  *
+ * <p><b>Identity is a bearer token</b>, checked by the shipped OIDC tenant (epic qits-543,
+ * qits-1370: the forwarded {@code X-Qits-*} headers authenticate nothing). There is still no idp to
+ * stand up: the profile hands the tenant the suite's local verification key and the issuer the idp
+ * would publish, exactly as {@code security/BearerAuthProfile} does, so a token is checked without a
+ * key fetch and no story draws an arrow to an idp. The key pair exists for this suite only and
+ * protects nothing.
+ *
  * <p><b>Every key here is a RUNTIME key.</b> A packaged process takes its configuration as {@code
  * -D} arguments on an artifact that was already built, so a build-time key would be silently ignored
  * and the catalogue would prove something other than what it says.
@@ -38,32 +46,38 @@ public class StoryProfile implements QuarkusTestProfile {
   @Override
   public Map<String, String> getConfigOverrides() {
     Path home = StoryEngine.install();
-    return Map.of(
+    return Map.ofEntries(
+        // The bearer check, without an idp: the local key replaces discovery and the key fetch.
+        Map.entry("quarkus.oidc.auth-server-url", ""),
+        Map.entry("quarkus.oidc.public-key", BearerTokens.verificationKey()),
+        Map.entry("quarkus.oidc.token.issuer", BearerTokens.ISSUER),
+        // The posture after qits-1338, today: qits-auth-core still reads X-Qits-User / X-Qits-Roles
+        // in a packaged process, and nothing strips them in front of a launched artifact, so the
+        // forward headers are renamed and a forged pair authenticates nothing. Both keys go with
+        // qits-1338, which removes forward-auth from the library.
+        Map.entry("qits.auth.forward.user-header", "X-Qits-Disabled-User"),
+        Map.entry("qits.auth.forward.roles-header", "X-Qits-Disabled-Roles"),
         // The one seam that matters: where the disk state is. The packaged artifact is otherwise
         // exactly what ships — the same route, the same door, the same worker protocol.
         // `docker/Dockerfile` moves this same key (QITS_SPEECH_HOME) for the same reason.
-        "qits.speech.home",
-        home.toString(),
+        Map.entry("qits.speech.home", home.toString()),
         // THE INTERPRETER THAT CREATES THE VENV, and it is pointed at a RECORDING STAND-IN rather
         // than — as the first rollout did — at a path that cannot exist. Both arrangements keep
         // `python3 -m venv` and `pip install onnx-asr[cpu,hub]` away from PyPI; only this one makes
         // the absence provable. A binary that exists and records is what turns "no venv was built
         // and no model was downloaded" from a sentence in a description into
         // assertNoEdgesTo(the host python) on every story that transcribes anything.
-        "qits.speech.python",
-        StoryEngine.hostPython().toString(),
+        Map.entry("qits.speech.python", StoryEngine.hostPython().toString()),
         // Left at the code default, said out loud: warmup bootstraps the venv and spawns the worker
         // on a virtual thread at startup. Off, the first spawn in the whole run is caused by the
         // first request — which is what lets the first story claim it, and why the recording is
         // registered at zero with no floor.
-        "qits.speech.warmup-on-start",
-        "false",
+        Map.entry("qits.speech.warmup-on-start", "false"),
         // Dark outside a deployment, like %dev/%test. A packaged run is the `prod` profile, so the
         // shipped %test line does not apply here and this has to be said. It is also the catalogue's
         // one STATED GAP in the diagram: with the exporter off there is no tap that could see an
         // OTLP export, so no story is entitled to assert that none happened. Turning it on instead
         // would put a batched, timer-driven export into whichever story was open when it fired.
-        "quarkus.otel.sdk.disabled",
-        "true");
+        Map.entry("quarkus.otel.sdk.disabled", "true"));
   }
 }

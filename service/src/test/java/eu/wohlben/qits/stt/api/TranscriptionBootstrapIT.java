@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import eu.wohlben.qits.stt.security.BearerTokens;
 import eu.wohlben.qits.stt.stories.support.StoryClip;
 import eu.wohlben.qits.stt.stories.support.StoryEngine;
 import eu.wohlben.qits.stt.stories.support.StoryProfile;
@@ -41,11 +42,10 @@ import org.junit.jupiter.api.TestMethodOrder;
  *
  * <ul>
  *   <li><b>The door in front of the route is real.</b> {@code SpeechController} is
- *       {@code @RolesAllowed("qits:admin")}, but every {@code @QuarkusTest} in this repo arrives as
- *       {@code dev} with that role: qits-auth-core ships {@code %test.qits.auth.forward.dev-user},
- *       and {@code ForwardAuthMechanism} additionally ignores it under {@code LaunchMode.NORMAL} —
- *       which is the mode a packaged process runs in. So the refusals a deployment gives are
- *       reachable in this catalogue and nowhere else in the suite.
+ *       {@code @RolesAllowed("qits:admin")}, and here the shipped OIDC tenant checks a real signed
+ *       bearer in front of it (qits-1370), where every {@code @QuarkusTest} in this repo names its
+ *       identity with {@code @TestSecurity} instead. So the answers a deployment gives at the door
+ *       are reachable in this catalogue, and {@code security/BearerAuthTest} is their only sibling.
  *   <li><b>The engine seam is real.</b> {@code TranscriptionServiceTest} replaces {@code
  *       ProcessExecutor} and {@code SpeechWorker} with CDI fakes, so the actual {@code
  *       ProcessBuilder} plumbing — spawn, the {@code {"ready":true}} greeting, one WAV path in, one
@@ -113,10 +113,12 @@ public class TranscriptionBootstrapIT {
    */
   static final String WORKER_RESOURCE = "/speech/transcribe_worker.py";
 
-  /** How the refusal story names each of its six callers. Six arrows in, and none out. */
-  private static final String NOBODY = "a caller the edge never named";
+  /** How the refusal story names each of its seven callers. Seven arrows in, and none out. */
+  private static final String NOBODY = "a caller with no credential";
 
-  private static final String A_BEARER = "a machine holding a bearer token";
+  private static final String FORGED_PAIR = "a caller sending only forged identity headers";
+
+  private static final String UNTRUSTED_BEARER = "a bearer the idp never signed";
 
   private static final String WITHOUT_ADMIN = "a signed-in user without qits:admin";
 
@@ -127,14 +129,11 @@ public class TranscriptionBootstrapIT {
   private static final String NOT_JSON = "an admin sending a body that is not JSON";
 
   /**
-   * A bearer that is not a credential here, and could not be: this service has no OIDC tenant at all
-   * — no {@code quarkus-oidc} extension, no {@code qits.auth.machine.*} — so identity arrives only
-   * as the edge's forwarded header. It is a literal rather than a minted token, which is the honest
-   * shape of the claim: nothing on this side ever looks at it. Asserted not to have leaked into the
-   * published bundle all the same, because a token-shaped string in a document reads like a secret
-   * whatever it actually is.
+   * A well-formed person token claiming {@code qits:admin}, signed by a key this service does not
+   * trust: the tenant checks the signature, so it is nobody here. Asserted not to have leaked into
+   * the published bundle, because a token in a document reads like a secret whatever it actually is.
    */
-  private static final String BEARER = "not-a-real-token-this-service-has-no-machine-door";
+  private static final String UNTRUSTED = BearerTokens.foreignToken(StoryTarget.ADMIN_ROLE);
 
   /** The generated staging name this run used, kept so the report can be proved free of it. */
   private static String stagedId;
@@ -182,17 +181,16 @@ public class TranscriptionBootstrapIT {
             + " built and no model is downloaded");
     given().get(StoryTarget.READY).then().statusCode(200);
 
-    // End (a), the caller's: the edge's forwarded identity opens the route and the transcript comes
+    // End (a), the caller's: the operator's own idp bearer opens the route and the transcript comes
     // back as the JSON the generated client expects.
     //
     // The actor is set BEFORE the call, because the tap sees a request and never a narrative role:
-    // X-Qits-User says "alice", and what the diagram needs to say is WHO put that header there.
+    // the bearer says "alice", and what the diagram needs to say is which hop delivered it.
     // Nothing here draws the arrow — the tap does, with the status this service answered — so the
     // note is left with the one thing a method, a path and a status cannot carry.
     NetworkCapture.actor(StoryTarget.EDGE);
     given()
-        .header("X-Qits-User", StoryTarget.USER)
-        .header("X-Qits-Roles", StoryTarget.ADMIN_ROLE)
+        .header("Authorization", StoryTarget.adminBearer())
         .contentType(ContentType.JSON)
         .body(Map.of("audioBase64", StoryClip.base64()))
         .when()
@@ -201,7 +199,8 @@ public class TranscriptionBootstrapIT {
         .statusCode(200)
         .body("text", equalTo(StoryTarget.TRANSCRIPT));
     story
-        .note("the edge forwards an operator's recording: a WAV as base64, under X-Qits-* headers")
+        .note("an operator's recording arrives through the edge: a WAV as base64, under the"
+            + " operator's own qits-idp bearer")
         .as("clip-submitted");
 
     // End (b), the engine's, read out of its own recording rather than believed: exactly two calls
@@ -268,36 +267,35 @@ public class TranscriptionBootstrapIT {
       a ~700 MB model, serving one request at a time. So the interesting half of the contract is
       what does NOT reach it.
 
-      Six refusals, in the order a deployed process applies them. Three are about who is asking: a
-      caller with no identity is challenged, because in a deployment there is no dev-user to fall
-      back on whatever a test suite enjoys; a caller holding a bearer token is challenged too, and
-      that is not an oversight but this service's shape — it has no OIDC tenant at all, so identity
-      arrives as the edge's forwarded header or it does not arrive; and a signed-in user without
-      `qits:admin` is forbidden rather than challenged, because reaching the service is not the
-      same as being allowed to dictate into it.
+      Seven refusals, in the order a deployed process applies them. Four are about who is asking.
+      A caller with no credential is challenged. So is a caller sending only an X-Qits-User /
+      X-Qits-Roles pair claiming qits:admin: that pair was once the edge's word for a signed-in
+      operator, and it is nobody's word now — the only credential is a qits-idp bearer, which this
+      service checks itself. So is a bearer signed by a key the idp never held, whatever it claims.
+      And a signed-in user whose bearer lacks `qits:admin` is forbidden rather than challenged,
+      because reaching the service is not the same as being allowed to dictate into it.
 
       Three are about what is being asked. A body that is not JSON never reaches the method. Base64
       that is not base64 is decoded HERE, and a decode failure is this service's 400 with a
       sentence in it rather than a spawned process and a timeout. A request with no clip in it at
       all fails validation on the way in.
 
-      In all six the engine stays exactly as it was: never asked, never woken — and neither is the
+      In all seven the engine stays exactly as it was: never asked, never woken — and neither is the
       host interpreter that would build a venv. That is the paying half, and the diagram is where
-      it is checkable: six arrows in, and not one leaving this process.
+      it is checkable: seven arrows in, and not one leaving this process.
       """)
   @Order(2)
   void neitherAStrangerNorNonsenseReachesTheEngine(Interactions story) {
     int before = StoryEngine.mark();
     String clip = StoryClip.base64();
 
-    // Six callers, six arrows, and the actor is named before EACH of them: the tap reads the sticky
-    // initiator at the moment of the call, so a name set late would draw the previous caller's
-    // arrow. It is also what keeps the refusals from collapsing — the framework dedupes on the whole
-    // (kind, from, to, label) quadruple, and two of these six answer the same 401.
+    // Seven callers, seven arrows, and the actor is named before EACH of them: the tap reads the
+    // sticky initiator at the moment of the call, so a name set late would draw the previous
+    // caller's arrow. It is also what keeps the refusals from collapsing — the framework dedupes on
+    // the whole (kind, from, to, label) quadruple, and three of these seven answer the same 401.
 
-    // (a) no forwarded identity at all. The %test dev-user that hands every @QuarkusTest in this
-    // repo a qits:admin identity is scoped to the test profile AND ignored under LaunchMode.NORMAL,
-    // so this — a challenge, not a silent anonymous pass — is the deployed answer.
+    // (a) no credential at all. There is no dev user in a packaged process, so this — a challenge,
+    // not a silent anonymous pass — is the deployed answer.
     NetworkCapture.actor(NOBODY);
     given()
         .contentType(ContentType.JSON)
@@ -307,13 +305,25 @@ public class TranscriptionBootstrapIT {
         .then()
         .statusCode(401);
 
-    // (b) a bearer token, which is nobody here. Worth its own arrow because the answer is the same
-    // 401 for a completely different reason: five other qits services would have validated this
-    // against qits-platform-idp, and this one has no tenant to validate it with. A machine that
-    // wants a transcription goes through the edge like everybody else.
-    NetworkCapture.actor(A_BEARER);
+    // (b) the X-Qits-User / X-Qits-Roles pair alone, claiming qits:admin. It used to be the edge's
+    // word for a signed-in operator; the edge asserts nothing now (qits-1373) and forward-auth
+    // leaves qits-auth-core (qits-1338), so it is a header nothing believes.
+    NetworkCapture.actor(FORGED_PAIR);
     given()
-        .header("Authorization", "Bearer " + BEARER)
+        .header("X-Qits-User", StoryTarget.USER)
+        .header("X-Qits-Roles", StoryTarget.ADMIN_ROLE)
+        .contentType(ContentType.JSON)
+        .body(Map.of("audioBase64", clip))
+        .when()
+        .post(StoryTarget.ROUTE)
+        .then()
+        .statusCode(401);
+
+    // (c) a well-formed bearer claiming qits:admin, signed by a key the idp never held. The tenant
+    // checks the signature before any role is read, so this is a challenge, not a 403.
+    NetworkCapture.actor(UNTRUSTED_BEARER);
+    given()
+        .header("Authorization", BearerTokens.bearer(UNTRUSTED))
         .contentType(ContentType.JSON)
         .body(Map.of("audioBase64", clip))
         .when()
@@ -321,17 +331,16 @@ public class TranscriptionBootstrapIT {
         .then()
         .statusCode(401);
     story
-        .note("no identity and a bearer token get the same answer for opposite reasons: this"
-            + " service has no machine door at all, so a name arrives from the edge or not at all")
+        .note("no credential, a forged X-Qits-* pair and a bearer the idp never signed get the same"
+            + " answer: the only credential here is a qits-idp bearer, and none of them is one")
         .as("anonymous-refused");
 
-    // (c) a real user, forwarded by the edge, holding a real platform role that is not the one this
+    // (d) a real user, with a valid bearer, holding a real platform role that is not the one this
     // route names. Authenticated, so this is authorization (403) rather than a missing-authentication
     // challenge (401) — the same pair qits-artifacts' admin guard draws.
     NetworkCapture.actor(WITHOUT_ADMIN);
     given()
-        .header("X-Qits-User", StoryTarget.USER)
-        .header("X-Qits-Roles", StoryTarget.READER_ROLE)
+        .header("Authorization", StoryTarget.readerBearer())
         .contentType(ContentType.JSON)
         .body(Map.of("audioBase64", clip))
         .when()
@@ -343,12 +352,11 @@ public class TranscriptionBootstrapIT {
             + " answer: they are somebody, and they cover nothing here")
         .as("non-admin-refused");
 
-    // (d) past the door, and not JSON. The route is @Consumes(APPLICATION_JSON), so this is refused
+    // (e) past the door, and not JSON. The route is @Consumes(APPLICATION_JSON), so this is refused
     // by content negotiation before the resource method exists to be entered.
     NetworkCapture.actor(NOT_JSON);
     given()
-        .header("X-Qits-User", StoryTarget.USER)
-        .header("X-Qits-Roles", StoryTarget.ADMIN_ROLE)
+        .header("Authorization", StoryTarget.adminBearer())
         .contentType(ContentType.TEXT)
         .body("this is not a request body")
         .when()
@@ -356,12 +364,11 @@ public class TranscriptionBootstrapIT {
         .then()
         .statusCode(415);
 
-    // (e) JSON, and no clip in it. @NotBlank on the record, so the violation is refused on the way
+    // (f) JSON, and no clip in it. @NotBlank on the record, so the violation is refused on the way
     // in rather than becoming an empty byte array somebody has to check for later.
     NetworkCapture.actor(NO_AUDIO);
     given()
-        .header("X-Qits-User", StoryTarget.USER)
-        .header("X-Qits-Roles", StoryTarget.ADMIN_ROLE)
+        .header("Authorization", StoryTarget.adminBearer())
         .contentType(ContentType.JSON)
         .body(Map.of("audioBase64", ""))
         .when()
@@ -369,13 +376,12 @@ public class TranscriptionBootstrapIT {
         .then()
         .statusCode(400);
 
-    // (f) a clip that is not base64. SttExceptionMapper turns this context's BadRequestException
+    // (g) a clip that is not base64. SttExceptionMapper turns this context's BadRequestException
     // into the JSON envelope every qits client reads — a message, not a stack trace and not the
     // framework's HTML error page.
     NetworkCapture.actor(NOT_BASE64);
     given()
-        .header("X-Qits-User", StoryTarget.USER)
-        .header("X-Qits-Roles", StoryTarget.ADMIN_ROLE)
+        .header("Authorization", StoryTarget.adminBearer())
         .contentType(ContentType.JSON)
         .body(Map.of("audioBase64", "!!! not base64 !!!"))
         .when()
@@ -389,7 +395,7 @@ public class TranscriptionBootstrapIT {
             + " and none of them is a spawned process and a timeout")
         .as("not-audio-refused");
 
-    // The other end of all six: neither child process was touched. This is the assertion the repo's
+    // The other end of all seven: neither child process was touched. This is the assertion the repo's
     // validation-level @QuarkusTest cannot make — it has no engine to look at, only fakes.
     //
     // It is a step and NOT an edge, deliberately: "nothing happened" is an absence, and an absence
@@ -454,7 +460,8 @@ public class TranscriptionBootstrapIT {
 
     ReportAssertions.assertComplete(CATEGORY_SLUG, REFUSED_SLUG, UserflowReport.PASSED);
     in(REFUSED_SLUG, NOBODY, "POST " + StoryTarget.ROUTE + " -> 401");
-    in(REFUSED_SLUG, A_BEARER, "POST " + StoryTarget.ROUTE + " -> 401");
+    in(REFUSED_SLUG, FORGED_PAIR, "POST " + StoryTarget.ROUTE + " -> 401");
+    in(REFUSED_SLUG, UNTRUSTED_BEARER, "POST " + StoryTarget.ROUTE + " -> 401");
     in(REFUSED_SLUG, WITHOUT_ADMIN, "POST " + StoryTarget.ROUTE + " -> 403");
     in(REFUSED_SLUG, NOT_JSON, "POST " + StoryTarget.ROUTE + " -> 415");
     in(REFUSED_SLUG, NO_AUDIO, "POST " + StoryTarget.ROUTE + " -> 400");
@@ -465,12 +472,13 @@ public class TranscriptionBootstrapIT {
     ReportAssertions.assertNoEdgesTo(CATEGORY_SLUG, REFUSED_SLUG, StoryEngine.ENGINE);
     ReportAssertions.assertNoEdgesTo(CATEGORY_SLUG, REFUSED_SLUG, StoryEngine.HOST_PYTHON);
     ReportAssertions.assertNoEdgesFrom(CATEGORY_SLUG, REFUSED_SLUG, StoryTarget.SERVICE);
-    ReportAssertions.assertEdgeCount(CATEGORY_SLUG, REFUSED_SLUG, 6);
+    ReportAssertions.assertEdgeCount(CATEGORY_SLUG, REFUSED_SLUG, 7);
     ReportAssertions.assertOnlyEdgesFrom(
         CATEGORY_SLUG,
         REFUSED_SLUG,
-        List.of(NOBODY, A_BEARER, WITHOUT_ADMIN, NOT_JSON, NO_AUDIO, NOT_BASE64));
-    ReportAssertions.assertNotLeaked(CATEGORY_SLUG, REFUSED_SLUG, BEARER);
+        List.of(
+            NOBODY, FORGED_PAIR, UNTRUSTED_BEARER, WITHOUT_ADMIN, NOT_JSON, NO_AUDIO, NOT_BASE64));
+    ReportAssertions.assertNotLeaked(CATEGORY_SLUG, REFUSED_SLUG, UNTRUSTED);
     ReportAssertions.assertStepId(CATEGORY_SLUG, REFUSED_SLUG, "anonymous-refused");
     ReportAssertions.assertStepId(CATEGORY_SLUG, REFUSED_SLUG, "non-admin-refused");
     ReportAssertions.assertStepId(CATEGORY_SLUG, REFUSED_SLUG, "not-audio-refused");

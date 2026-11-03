@@ -101,8 +101,8 @@ public class ResidentEngineIT {
     NetworkCapture.actor(StoryTarget.EDGE);
     transcribe();
     story
-        .note("a second recording arrives from the edge, on the same route and with the same"
-            + " forwarded identity as the first")
+        .note("a second recording arrives through the edge, on the same route and with the same"
+            + " operator's bearer as the first")
         .as("second-clip-submitted");
 
     transcribe();
@@ -147,8 +147,7 @@ public class ResidentEngineIT {
 
   private static void transcribe() {
     given()
-        .header("X-Qits-User", StoryTarget.USER)
-        .header("X-Qits-Roles", StoryTarget.ADMIN_ROLE)
+        .header("Authorization", StoryTarget.adminBearer())
         .contentType(ContentType.JSON)
         .body(Map.of("audioBase64", StoryClip.base64()))
         .when()
