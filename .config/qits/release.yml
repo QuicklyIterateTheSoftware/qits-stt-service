@@ -2,3 +2,9 @@ archetype: java-service
 artifacts:
   - { type: docker, name: qits/qits-stt, sbom: .sbom/sbom.json }
 userflows: qits-stt
+# The provider golden masters (ticket qits-1935): the platform packages `golden-masters/` as
+# `eu.wohlben.qits:qits-stt-golden-masters` and `@qits/stt-golden-masters`, each published only
+# when its content changed. `contracts/GoldenMasterRecordingTest` records them.
+contracts:
+  application: qits-stt
+  golden-masters: { from: golden-masters/, packages: [maven, npm] }

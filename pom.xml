@@ -85,6 +85,9 @@
              epic qits-1621's check that every route admitting qits:admin-agent also admits
              qits:desk-admin. This repo did not depend on qits-arch-rules before. -->
         <qits.arch-rules.version>2026.1106.507</qits.arch-rules.version>
+        <!-- pact-jvm's JUnit 5 provider, for contracts/ConsumerPactVerificationTest: the version every
+             provider on the estate verifies with, so a consumer's pact is read the same way. -->
+        <pact.version>4.7.5</pact.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
 
         <compiler-plugin.version>3.15.0</compiler-plugin.version>

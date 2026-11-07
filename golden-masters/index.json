@@ -1,0 +1,33 @@
+{
+  "formatVersion": 1,
+  "provider": "qits-stt",
+  "states": [
+    {
+      "name": "a resident speech engine",
+      "slug": "a-resident-speech-engine",
+      "params": {
+        "audioBase64": "UklGRjQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YRAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "text": "Open a ticket for the failing build."
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "transcribe",
+          "method": "POST",
+          "path": "/stt/api/transcriptions",
+          "body": {
+            "audioBase64": "UklGRjQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YRAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          },
+          "status": 200,
+          "file": "a-resident-speech-engine/transcribe.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    }
+  ]
+}

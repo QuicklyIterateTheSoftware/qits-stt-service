@@ -150,6 +150,23 @@ The two `@QuarkusTest` suites **touch no python at all**:
 A test that actually ran the real worker would need a venv, a pip install and a 700 MB model
 download. Keep the fakes.
 
+### The provider golden masters
+
+`service/src/test/java/eu/wohlben/qits/stt/contracts/` follows qits-edge-service and
+qits-observability-service (ticket qits-1935). `GoldenMasterRecordingTest` records
+`golden-masters/` (provider `qits-stt`, state `a resident speech engine`, operation `transcribe`),
+which `.config/qits/release.yml` publishes as `eu.wohlben.qits:qits-stt-golden-masters` and
+`@qits/stt-golden-masters`. It compares by default; `-Dgolden.update=true` rewrites:
+
+    ./mvnw -pl service test -Dtest='GoldenMasterRecordingTest,ConsumerPactVerificationTest,ProviderStateCoverageTest' -Dgolden.update=true
+
+Both `@QuarkusTest`s run under `ContractProfile`, which points `qits.speech.home` at
+`ContractEngine`'s pre-seeded home under `target/`: a `/bin/sh` resident worker answering a fixed
+transcript, and a host-python stand-in that refuses. So the route, the staging and the worker
+protocol are real, and still no venv, pip or model is involved. `ConsumerPactVerificationTest`
+verifies nothing yet (`@IgnoreNoPactsToVerify`, `ClasspathPactLoader.REQUIRED = false`): no consumer
+pins a pact against qits-stt-service. When the first one is pinned, flip both.
+
 ### The story catalogue, and the worker processes a test may spawn
 
 **Seven `@UserStory` methods over four `@QuarkusIntegrationTest` classes**, emitting
