@@ -58,3 +58,12 @@ volumes: private:data:/data
 # telemetry to qits-observability's edge host, where the edge refuses an anonymous request (epic
 # qits-428). Validating the bearers callers present needs no resource; presenting one does.
 resources: idp:client
+
+# PRIVATE EXPOSURE (qits-1978, the private-edge pilot): the deployer puts this service on the
+# encrypted `qits-private` overlay alone, so only `qits-edge-private` serves `stt.qits.<domain>`:
+# through the WireGuard tunnel for enrolled peers, and over the overlay for host containers. The
+# public edge withdraws the vhost and answers 404. That is safe because this service reads no
+# database and no event stream, and every outbound call (idp, observability, HuggingFace, PyPI)
+# goes out by public name through docker's gateway. Revert: delete this line and release. The
+# deployer's network-drift check then recreates the service back on `qits-net`.
+exposure: private
