@@ -60,13 +60,22 @@ The API is one route:
 
     POST /stt/api/transcriptions   { "audioBase64": "…" } -> { "text": "…" }
 
-Everything this service serves lives under the `/stt` segment — `qits-platform-edge` routes
-verbatim by prefix, so the prefix is part of the address here, not something a proxy adds. `/stt/api` is
+Everything this service serves lives under the `/stt` segment — the edge routes verbatim by
+prefix, so the prefix is part of the address here, not something a proxy adds. `/stt/api` is
 `quarkus.rest.path`; the framework's own surface (`/stt/q/openapi`, `/stt/q/swagger-ui`) sits under
 `quarkus.http.non-application-root-path`. There is no unprefixed form.
 
 Base64 in JSON rather than multipart, deliberately: the clips are small and it keeps the generated
 client trivial. Payloads are capped at 30 MB (≈16 minutes of 16 kHz mono 16-bit WAV).
+
+### Behind the private edge
+
+`.config/qits/deployments.yml` declares `exposure: private` (qits-1978). Only `qits-edge-private`
+routes `stt.qits.<domain>`, reached through the WireGuard tunnel or the `qits-private` overlay; the
+public edge answers 404 for it. The deployer hands the service the private edge's VIP on
+`qits-private` as its first resolver, then the host's upstreams (qits-1980), so a call this service
+makes to another private app by its public name is answered by the private edge. Its calls to idp
+and qits-observability, which stay public, resolve to the public edge as before.
 
 ## Configuration
 
