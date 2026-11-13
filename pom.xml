@@ -84,7 +84,7 @@
         <!-- The platform's shared ArchUnit rules (test scope), carrying DeskAdminParityRules —
              epic qits-1621's check that every route admitting qits:admin-agent also admits
              qits:desk-admin. This repo did not depend on qits-arch-rules before. -->
-        <qits.arch-rules.version>2026.1108.20205</qits.arch-rules.version>
+        <qits.arch-rules.version>2026.1113.14706</qits.arch-rules.version>
         <!-- pact-jvm's JUnit 5 provider, for contracts/ConsumerPactVerificationTest: the version every
              provider on the estate verifies with, so a consumer's pact is read the same way. -->
         <pact.version>4.7.5</pact.version>
